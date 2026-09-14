@@ -11,12 +11,32 @@ import { interviewRouter } from "./routes/interview.js";
 import { proctorRouter } from "./routes/proctoring.js";
 
 const app = express();
+const frontendOrigin = process.env.FRONTEND_ORIGIN || "http://localhost:5173";
 const allowedOrigins = new Set([
-  process.env.FRONTEND_ORIGIN || "http://localhost:5173",
+  frontendOrigin,
   "http://localhost:5173",
   "http://127.0.0.1:5173",
 ]);
-app.use(cors({ origin: (origin, callback) => callback(null, !origin || allowedOrigins.has(origin)) }));
+app.use(
+  cors({
+    origin: (origin, callback) => {
+      // Same-origin (one-service mode on :4000) sends Origin http://localhost:4000.
+      // Allow any localhost / 127.0.0.1 origin so Vite (5173) AND one-service (4000)
+      // both work, plus the configured FRONTEND_ORIGIN for deploys.
+      if (!origin) return callback(null, true);
+      if (allowedOrigins.has(origin)) return callback(null, true);
+      try {
+        const u = new URL(origin);
+        const isLocal = u.hostname === "localhost" || u.hostname === "127.0.0.1";
+        if (isLocal) return callback(null, true);
+        if (u.origin === frontendOrigin) return callback(null, true);
+      } catch {
+        // fall through to deny
+      }
+      return callback(null, false);
+    },
+  })
+);
 app.use(express.json({ limit: "2mb" }));
 
 app.get("/api/health", (_req, res) => {
