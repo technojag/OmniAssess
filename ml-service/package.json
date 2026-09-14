@@ -1,0 +1,8 @@
+{
+  "name": "omniassess-ml-service",
+  "private": true,
+  "scripts": {
+    "dev": "python -m uvicorn main:app --reload --port 8001",
+    "test": "python -m pytest -q"
+  }
+}
