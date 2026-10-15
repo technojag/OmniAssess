@@ -19,6 +19,29 @@ enum Category {
   CORPORATE
 }
 
+enum Difficulty {
+  EASY
+  MEDIUM
+  HARD
+}
+
+enum QuestionStatus {
+  DRAFT
+  APPROVED
+  RETIRED
+}
+
+enum QuestionSource {
+  MANUAL
+  AI
+}
+
+enum VersionStatus {
+  DRAFT
+  PUBLISHED
+  ARCHIVED
+}
+
 model User {
   id                     String       @id @default(uuid())
   email                  String       @unique
@@ -45,4 +68,104 @@ model UserProfile {
   updatedAt  DateTime @updatedAt
 
   @@map("user_profiles")
+}
+
+model Subject {
+  id        String        @id @default(uuid())
+  name      String        @unique
+  topics    Topic[]
+  questions Question[]
+  sections  ExamSection[]
+
+  @@map("subjects")
+}
+
+model Topic {
+  id        String     @id @default(uuid())
+  subjectId String
+  subject   Subject    @relation(fields: [subjectId], references: [id])
+  name      String
+  questions Question[]
+
+  @@unique([subjectId, name])
+  @@map("topics")
+}
+
+model Question {
+  id          String           @id @default(uuid())
+  subjectId   String
+  subject     Subject          @relation(fields: [subjectId], references: [id])
+  topicId     String?
+  topic       Topic?           @relation(fields: [topicId], references: [id])
+  stem        String
+  explanation String?
+  difficulty  Difficulty       @default(MEDIUM)
+  status      QuestionStatus   @default(DRAFT)
+  source      QuestionSource   @default(MANUAL)
+  language    String           @default("en")
+  options     QuestionOption[]
+  createdAt   DateTime         @default(now())
+  updatedAt   DateTime         @updatedAt
+
+  @@index([subjectId, status, difficulty])
+  @@map("questions")
+}
+
+model QuestionOption {
+  id         String   @id @default(uuid())
+  questionId String
+  question   Question @relation(fields: [questionId], references: [id], onDelete: Cascade)
+  position   Int
+  text       String
+  isCorrect  Boolean  @default(false)
+
+  @@unique([questionId, position])
+  @@map("question_options")
+}
+
+model ExamTemplate {
+  id          String                @id @default(uuid())
+  slug        String                @unique
+  name        String
+  category    Category
+  description String?
+  versions    ExamTemplateVersion[]
+  createdAt   DateTime              @default(now())
+  updatedAt   DateTime              @updatedAt
+
+  @@map("exam_templates")
+}
+
+model ExamTemplateVersion {
+  id          String        @id @default(uuid())
+  templateId  String
+  template    ExamTemplate  @relation(fields: [templateId], references: [id], onDelete: Cascade)
+  version     Int
+  status      VersionStatus @default(DRAFT)
+  rules       Json          @default("{}")
+  publishedAt DateTime?
+  sections    ExamSection[]
+  createdAt   DateTime      @default(now())
+
+  @@unique([templateId, version])
+  @@map("exam_template_versions")
+}
+
+model ExamSection {
+  id                    String              @id @default(uuid())
+  templateVersionId     String
+  templateVersion       ExamTemplateVersion @relation(fields: [templateVersionId], references: [id], onDelete: Cascade)
+  position              Int
+  name                  String
+  subjectId             String
+  subject               Subject             @relation(fields: [subjectId], references: [id])
+  durationSeconds       Int
+  questionCount         Int
+  marksPerQuestion      Decimal             @db.Decimal(5, 2)
+  negativeMarks         Decimal             @default(0) @db.Decimal(5, 2)
+  allowReturnToPrevious Boolean             @default(false)
+  rules                 Json                @default("{}")
+
+  @@unique([templateVersionId, position])
+  @@map("exam_sections")
 }
