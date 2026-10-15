@@ -7,10 +7,42 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
+enum Role {
+  CANDIDATE
+  ADMIN
+}
+
+enum Category {
+  SCHOOL
+  COLLEGE
+  GOVT_COMPETITIVE
+  CORPORATE
+}
+
 model User {
-  id        String   @id @default(uuid())
-  email     String   @unique
-  createdAt DateTime @default(now())
+  id                     String       @id @default(uuid())
+  email                  String       @unique
+  passwordHash           String
+  fullName               String
+  role                   Role         @default(CANDIDATE)
+  hasCompletedOnboarding Boolean      @default(false)
+  timezone               String       @default("Asia/Kolkata")
+  createdAt              DateTime     @default(now())
+  updatedAt              DateTime     @updatedAt
+  profile                UserProfile?
 
   @@map("users")
+}
+
+model UserProfile {
+  id         String   @id @default(uuid())
+  userId     String   @unique
+  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  category   Category
+  details    Json     @default("{}")
+  focusNotes String?
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  @@map("user_profiles")
 }
