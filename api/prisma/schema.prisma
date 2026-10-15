@@ -42,17 +42,37 @@ enum VersionStatus {
   ARCHIVED
 }
 
+enum AttemptStatus {
+  IN_PROGRESS
+  SUBMITTED
+  TERMINATED
+  EXPIRED
+}
+
+enum SectionState {
+  PENDING
+  ACTIVE
+  CLOSED
+}
+
+enum SectionCloseReason {
+  TIME_UP
+  SUBMITTED_EARLY
+  TERMINATED
+}
+
 model User {
-  id                     String       @id @default(uuid())
-  email                  String       @unique
+  id                     String        @id @default(uuid())
+  email                  String        @unique
   passwordHash           String
   fullName               String
-  role                   Role         @default(CANDIDATE)
-  hasCompletedOnboarding Boolean      @default(false)
-  timezone               String       @default("Asia/Kolkata")
-  createdAt              DateTime     @default(now())
-  updatedAt              DateTime     @updatedAt
+  role                   Role          @default(CANDIDATE)
+  hasCompletedOnboarding Boolean       @default(false)
+  timezone               String        @default("Asia/Kolkata")
+  createdAt              DateTime      @default(now())
+  updatedAt              DateTime      @updatedAt
   profile                UserProfile?
+  attempts               ExamAttempt[]
 
   @@map("users")
 }
@@ -92,32 +112,34 @@ model Topic {
 }
 
 model Question {
-  id          String           @id @default(uuid())
-  subjectId   String
-  subject     Subject          @relation(fields: [subjectId], references: [id])
-  topicId     String?
-  topic       Topic?           @relation(fields: [topicId], references: [id])
-  stem        String
-  explanation String?
-  difficulty  Difficulty       @default(MEDIUM)
-  status      QuestionStatus   @default(DRAFT)
-  source      QuestionSource   @default(MANUAL)
-  language    String           @default("en")
-  options     QuestionOption[]
-  createdAt   DateTime         @default(now())
-  updatedAt   DateTime         @updatedAt
+  id           String            @id @default(uuid())
+  subjectId    String
+  subject      Subject           @relation(fields: [subjectId], references: [id])
+  topicId      String?
+  topic        Topic?            @relation(fields: [topicId], references: [id])
+  stem         String
+  explanation  String?
+  difficulty   Difficulty        @default(MEDIUM)
+  status       QuestionStatus    @default(DRAFT)
+  source       QuestionSource    @default(MANUAL)
+  language     String            @default("en")
+  options      QuestionOption[]
+  attemptItems AttemptQuestion[]
+  createdAt    DateTime          @default(now())
+  updatedAt    DateTime          @updatedAt
 
   @@index([subjectId, status, difficulty])
   @@map("questions")
 }
 
 model QuestionOption {
-  id         String   @id @default(uuid())
+  id         String     @id @default(uuid())
   questionId String
-  question   Question @relation(fields: [questionId], references: [id], onDelete: Cascade)
+  question   Question   @relation(fields: [questionId], references: [id], onDelete: Cascade)
   position   Int
   text       String
-  isCorrect  Boolean  @default(false)
+  isCorrect  Boolean    @default(false)
+  responses  Response[]
 
   @@unique([questionId, position])
   @@map("question_options")
@@ -145,6 +167,7 @@ model ExamTemplateVersion {
   rules       Json          @default("{}")
   publishedAt DateTime?
   sections    ExamSection[]
+  attempts    ExamAttempt[]
   createdAt   DateTime      @default(now())
 
   @@unique([templateId, version])
@@ -165,7 +188,90 @@ model ExamSection {
   negativeMarks         Decimal             @default(0) @db.Decimal(5, 2)
   allowReturnToPrevious Boolean             @default(false)
   rules                 Json                @default("{}")
+  attemptSections       AttemptSection[]
 
   @@unique([templateVersionId, position])
   @@map("exam_sections")
+}
+
+model ExamAttempt {
+  id                String              @id @default(uuid())
+  userId            String
+  user              User                @relation(fields: [userId], references: [id], onDelete: Cascade)
+  templateVersionId String
+  templateVersion   ExamTemplateVersion @relation(fields: [templateVersionId], references: [id])
+  isPractice        Boolean             @default(false)
+  status            AttemptStatus       @default(IN_PROGRESS)
+  startedAt         DateTime            @default(now())
+  submittedAt       DateTime?
+  score             Decimal?            @db.Decimal(7, 2)
+  maxScore          Decimal?            @db.Decimal(7, 2)
+  warningCount      Int                 @default(0)
+  integrityScore    Int                 @default(100)
+  sections          AttemptSection[]
+  questions         AttemptQuestion[]
+  events            AttemptEvent[]
+
+  @@index([userId, status])
+  @@map("exam_attempts")
+}
+
+model AttemptSection {
+  id            String              @id @default(uuid())
+  attemptId     String
+  attempt       ExamAttempt         @relation(fields: [attemptId], references: [id], onDelete: Cascade)
+  examSectionId String
+  examSection   ExamSection         @relation(fields: [examSectionId], references: [id])
+  position      Int
+  state         SectionState        @default(PENDING)
+  startedAt     DateTime?
+  deadlineAt    DateTime?
+  closedAt      DateTime?
+  closeReason   SectionCloseReason?
+  questions     AttemptQuestion[]
+
+  @@unique([attemptId, examSectionId])
+  @@unique([attemptId, position])
+  @@index([state, deadlineAt])
+  @@map("attempt_sections")
+}
+
+model AttemptQuestion {
+  id               String         @id @default(uuid())
+  attemptId        String
+  attempt          ExamAttempt    @relation(fields: [attemptId], references: [id], onDelete: Cascade)
+  attemptSectionId String
+  attemptSection   AttemptSection @relation(fields: [attemptSectionId], references: [id], onDelete: Cascade)
+  questionId       String
+  question         Question       @relation(fields: [questionId], references: [id])
+  position         Int
+  response         Response?
+
+  @@unique([attemptSectionId, position])
+  @@unique([attemptId, questionId])
+  @@map("attempt_questions")
+}
+
+model Response {
+  id                String          @id @default(uuid())
+  attemptQuestionId String          @unique
+  attemptQuestion   AttemptQuestion @relation(fields: [attemptQuestionId], references: [id], onDelete: Cascade)
+  selectedOptionId  String?
+  selectedOption    QuestionOption? @relation(fields: [selectedOptionId], references: [id])
+  markedForReview   Boolean         @default(false)
+  savedAt           DateTime        @updatedAt
+
+  @@map("responses")
+}
+
+model AttemptEvent {
+  id        String      @id @default(uuid())
+  attemptId String
+  attempt   ExamAttempt @relation(fields: [attemptId], references: [id], onDelete: Cascade)
+  type      String
+  payload   Json        @default("{}")
+  createdAt DateTime    @default(now())
+
+  @@index([attemptId, createdAt])
+  @@map("attempt_events")
 }
