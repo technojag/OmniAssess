@@ -6,6 +6,7 @@ import { prisma } from './db';
 import { authRouter } from './modules/auth/auth.routes';
 import { onboardingRouter } from './modules/onboarding/onboarding.routes';
 import { examsRouter } from './modules/exams/exams.routes';
+import { attemptsRouter } from './modules/attempts/attempts.routes';
 import { errorHandler } from './middleware/error-handler';
 
 export const app = express();
@@ -32,6 +33,7 @@ app.get('/health/db', async (_req, res) => {
 app.use('/api/v1/auth', authRouter);
 app.use('/api/v1/onboarding', onboardingRouter);
 app.use('/api/v1/exams', examsRouter);
+app.use('/api/v1/attempts', attemptsRouter);
 
 // Must be the LAST middleware
 app.use(errorHandler);
