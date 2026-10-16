@@ -6,6 +6,8 @@ if (!secret || secret.length < 32) {
 export const config = {
   jwtAccessSecret: secret,
   accessTtlSeconds: 15 * 60,
+  refreshTtlDays: 30,
   cookieName: 'oa_access',
+  refreshCookieName: 'oa_refresh',
   isProd: process.env.NODE_ENV === 'production',
 };

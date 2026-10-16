@@ -22,20 +22,31 @@ export function verifyAccessToken(token: string): AuthPayload | null {
   }
 }
 
-const cookieOptions: CookieOptions = {
+const baseCookie: CookieOptions = {
   httpOnly: true, // JavaScript in the page cannot read this cookie
   sameSite: 'lax',
   secure: config.isProd, // HTTPS only in production
-  path: '/',
 };
+
+const accessCookie: CookieOptions = { ...baseCookie, path: '/' };
+// The refresh cookie is only sent to the auth endpoints, not to every API call
+const refreshCookie: CookieOptions = { ...baseCookie, path: '/api/v1/auth' };
 
 export function setAuthCookie(res: Response, p: AuthPayload) {
   res.cookie(config.cookieName, signAccessToken(p), {
-    ...cookieOptions,
+    ...accessCookie,
     maxAge: config.accessTtlSeconds * 1000,
   });
 }
 
-export function clearAuthCookie(res: Response) {
-  res.clearCookie(config.cookieName, cookieOptions);
+export function setRefreshCookie(res: Response, token: string) {
+  res.cookie(config.refreshCookieName, token, {
+    ...refreshCookie,
+    maxAge: config.refreshTtlDays * 24 * 60 * 60 * 1000,
+  });
+}
+
+export function clearAuthCookies(res: Response) {
+  res.clearCookie(config.cookieName, accessCookie);
+  res.clearCookie(config.refreshCookieName, refreshCookie);
 }

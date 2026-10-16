@@ -8,3 +8,4 @@ coverage/
 *.log
 .DS_Store
 cookies.txt
+requests/cookies*.txt

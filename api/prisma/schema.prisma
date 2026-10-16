@@ -62,17 +62,18 @@ enum SectionCloseReason {
 }
 
 model User {
-  id                     String        @id @default(uuid())
-  email                  String        @unique
+  id                     String         @id @default(uuid())
+  email                  String         @unique
   passwordHash           String
   fullName               String
-  role                   Role          @default(CANDIDATE)
-  hasCompletedOnboarding Boolean       @default(false)
-  timezone               String        @default("Asia/Kolkata")
-  createdAt              DateTime      @default(now())
-  updatedAt              DateTime      @updatedAt
+  role                   Role           @default(CANDIDATE)
+  hasCompletedOnboarding Boolean        @default(false)
+  timezone               String         @default("Asia/Kolkata")
+  createdAt              DateTime       @default(now())
+  updatedAt              DateTime       @updatedAt
   profile                UserProfile?
   attempts               ExamAttempt[]
+  refreshTokens          RefreshToken[]
 
   @@map("users")
 }
@@ -274,4 +275,17 @@ model AttemptEvent {
 
   @@index([attemptId, createdAt])
   @@map("attempt_events")
+}
+
+model RefreshToken {
+  id        String    @id @default(uuid())
+  userId    String
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  tokenHash String    @unique
+  expiresAt DateTime
+  revokedAt DateTime?
+  createdAt DateTime  @default(now())
+
+  @@index([userId])
+  @@map("refresh_tokens")
 }
