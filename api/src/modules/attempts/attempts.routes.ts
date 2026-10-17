@@ -2,7 +2,9 @@ import { Router } from 'express';
 import { requireAuth } from '../../middleware/require-auth';
 import { requireOnboarded } from '../../middleware/require-onboarded';
 import { attemptIdParam, responseParams, saveResponseSchema, startAttemptSchema } from './attempts.schemas';
+import { getReview, getSummary } from './attempts.result';
 import { continueSection, getAttemptView, saveAnswer, startOrResume } from './attempts.service';
+import { submitExam } from './attempts.submit';
 
 export const attemptsRouter = Router();
 
@@ -43,6 +45,35 @@ attemptsRouter.post('/:id/continue', async (req, res, next) => {
     const { id } = attemptIdParam.parse(req.params);
     await continueSection(req.auth!.userId, id);
     res.json(await getAttemptView(req.auth!.userId, id));
+  } catch (err) {
+    next(err);
+  }
+});
+
+// Submitting returns the SUMMARY (screen 1), not the answer key
+attemptsRouter.post('/:id/submit', async (req, res, next) => {
+  try {
+    const { id } = attemptIdParam.parse(req.params);
+    await submitExam(req.auth!.userId, id);
+    res.json(await getSummary(req.auth!.userId, id));
+  } catch (err) {
+    next(err);
+  }
+});
+
+attemptsRouter.get('/:id/summary', async (req, res, next) => {
+  try {
+    const { id } = attemptIdParam.parse(req.params);
+    res.json(await getSummary(req.auth!.userId, id));
+  } catch (err) {
+    next(err);
+  }
+});
+
+attemptsRouter.get('/:id/review', async (req, res, next) => {
+  try {
+    const { id } = attemptIdParam.parse(req.params);
+    res.json(await getReview(req.auth!.userId, id));
   } catch (err) {
     next(err);
   }

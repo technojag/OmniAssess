@@ -17,7 +17,7 @@ const attemptInclude = {
 type AttemptRow = Prisma.ExamAttemptGetPayload<{ include: typeof attemptInclude }>;
 
 // Database row -> the plain object the engine understands
-function toRuntime(a: AttemptRow): AttemptRuntime {
+export function toRuntime(a: AttemptRow): AttemptRuntime {
   return {
     status: a.status === 'IN_PROGRESS' ? 'IN_PROGRESS' : a.status === 'TERMINATED' ? 'TERMINATED' : 'SUBMITTED',
     sections: a.sections.map((s) => ({
@@ -43,7 +43,7 @@ function shuffle<T>(items: T[]): T[] {
 }
 
 // Save whatever the engine changed (sections opened or closed, attempt auto-submitted)
-async function persist(attempt: AttemptRow, before: AttemptRuntime, after: AttemptRuntime) {
+export async function persist(attempt: AttemptRow, before: AttemptRuntime, after: AttemptRuntime) {
   await prisma.$transaction(async (tx) => {
     for (let i = 0; i < after.sections.length; i++) {
       const s = after.sections[i];
@@ -73,7 +73,7 @@ async function persist(attempt: AttemptRow, before: AttemptRuntime, after: Attem
 }
 
 /** Loads the attempt (owner only), applies time-based closing, saves it, returns fresh data. */
-async function loadAndSync(userId: string, attemptId: string, now = new Date()): Promise<AttemptRow> {
+export async function loadAndSync(userId: string, attemptId: string, now = new Date()): Promise<AttemptRow> {
   const attempt = await prisma.examAttempt.findFirst({
     where: { id: attemptId, userId },
     include: attemptInclude,
