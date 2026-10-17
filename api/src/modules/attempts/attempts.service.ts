@@ -1,7 +1,14 @@
 import { Prisma, QuestionStatus, VersionStatus } from '@prisma/client';
 import { prisma } from '../../db';
 import { AppError } from '../../lib/errors';
-import { resolveExpiry, startAttempt, type AttemptRuntime } from '../exam-engine/engine';
+import {
+  EngineError,
+  canSaveAnswer,
+  continueToNextSection,
+  resolveExpiry,
+  startAttempt,
+  type AttemptRuntime,
+} from '../exam-engine/engine';
 
 const attemptInclude = {
   sections: { orderBy: { position: 'asc' }, include: { examSection: true } },
@@ -35,7 +42,7 @@ function shuffle<T>(items: T[]): T[] {
   return a;
 }
 
-// Save whatever the engine changed (sections closed by time, attempt auto-submitted)
+// Save whatever the engine changed (sections opened or closed, attempt auto-submitted)
 async function persist(attempt: AttemptRow, before: AttemptRuntime, after: AttemptRuntime) {
   await prisma.$transaction(async (tx) => {
     for (let i = 0; i < after.sections.length; i++) {
@@ -43,7 +50,13 @@ async function persist(attempt: AttemptRow, before: AttemptRuntime, after: Attem
       if (s === before.sections[i]) continue; // unchanged
       await tx.attemptSection.update({
         where: { id: attempt.sections[i].id },
-        data: { state: s.state, closedAt: s.closedAt, closeReason: s.closeReason },
+        data: {
+          state: s.state,
+          startedAt: s.startedAt,
+          deadlineAt: s.deadlineAt,
+          closedAt: s.closedAt,
+          closeReason: s.closeReason,
+        },
       });
     }
     if (after.status !== before.status) {
@@ -60,7 +73,7 @@ async function persist(attempt: AttemptRow, before: AttemptRuntime, after: Attem
 }
 
 /** Loads the attempt (owner only), applies time-based closing, saves it, returns fresh data. */
-export async function loadAndSync(userId: string, attemptId: string, now = new Date()): Promise<AttemptRow> {
+async function loadAndSync(userId: string, attemptId: string, now = new Date()): Promise<AttemptRow> {
   const attempt = await prisma.examAttempt.findFirst({
     where: { id: attemptId, userId },
     include: attemptInclude,
@@ -219,4 +232,72 @@ export async function getAttemptView(userId: string, attemptId: string) {
     })),
     currentSection,
   };
+}
+
+const BLOCK_MESSAGES: Record<string, string> = {
+  SECTION_LOCKED: 'This section has ended and is locked.',
+  SECTION_NOT_STARTED: 'This section has not started yet.',
+  SECTION_NOT_FOUND: 'Section not found.',
+  ATTEMPT_ENDED: 'This exam has already ended.',
+};
+
+export async function saveAnswer(
+  userId: string,
+  attemptId: string,
+  attemptQuestionId: string,
+  input: { selectedOptionId?: string | null; markedForReview?: boolean },
+) {
+  const now = new Date();
+  const attempt = await loadAndSync(userId, attemptId, now);
+
+  const item = await prisma.attemptQuestion.findFirst({
+    where: { id: attemptQuestionId, attemptId },
+    select: { questionId: true, attemptSection: { select: { position: true } } },
+  });
+  if (!item) throw new AppError(404, 'QUESTION_NOT_FOUND', 'Question not found in this exam.');
+
+  // The engine decides. The browser's clock and the browser's buttons do not matter.
+  const decision = canSaveAnswer(toRuntime(attempt), item.attemptSection.position, now);
+  if (!decision.allowed) {
+    throw new AppError(409, decision.code, BLOCK_MESSAGES[decision.code] ?? 'Answer cannot be saved.');
+  }
+
+  if (input.selectedOptionId) {
+    const ok = await prisma.questionOption.findFirst({
+      where: { id: input.selectedOptionId, questionId: item.questionId },
+      select: { id: true },
+    });
+    if (!ok) throw new AppError(400, 'INVALID_OPTION', 'That option does not belong to this question.');
+  }
+
+  const changes: Prisma.ResponseUncheckedUpdateInput = {};
+  if (input.selectedOptionId !== undefined) changes.selectedOptionId = input.selectedOptionId;
+  if (input.markedForReview !== undefined) changes.markedForReview = input.markedForReview;
+
+  const saved = await prisma.response.upsert({
+    where: { attemptQuestionId },
+    create: {
+      attemptQuestionId,
+      selectedOptionId: input.selectedOptionId ?? null,
+      markedForReview: input.markedForReview ?? false,
+    },
+    update: changes,
+    select: { savedAt: true },
+  });
+  return { saved: true, savedAt: saved.savedAt };
+}
+
+export async function continueSection(userId: string, attemptId: string) {
+  const now = new Date();
+  const attempt = await loadAndSync(userId, attemptId, now);
+
+  const before = toRuntime(attempt);
+  let after: AttemptRuntime;
+  try {
+    after = continueToNextSection(before, now);
+  } catch (e) {
+    if (e instanceof EngineError) throw new AppError(409, e.code, e.message);
+    throw e;
+  }
+  await persist(attempt, before, after);
 }

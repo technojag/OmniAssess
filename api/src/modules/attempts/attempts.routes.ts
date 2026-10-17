@@ -1,8 +1,8 @@
 import { Router } from 'express';
 import { requireAuth } from '../../middleware/require-auth';
 import { requireOnboarded } from '../../middleware/require-onboarded';
-import { attemptIdParam, startAttemptSchema } from './attempts.schemas';
-import { getAttemptView, startOrResume } from './attempts.service';
+import { attemptIdParam, responseParams, saveResponseSchema, startAttemptSchema } from './attempts.schemas';
+import { continueSection, getAttemptView, saveAnswer, startOrResume } from './attempts.service';
 
 export const attemptsRouter = Router();
 
@@ -22,6 +22,26 @@ attemptsRouter.post('/', async (req, res, next) => {
 attemptsRouter.get('/:id', async (req, res, next) => {
   try {
     const { id } = attemptIdParam.parse(req.params);
+    res.json(await getAttemptView(req.auth!.userId, id));
+  } catch (err) {
+    next(err);
+  }
+});
+
+attemptsRouter.put('/:id/responses/:attemptQuestionId', async (req, res, next) => {
+  try {
+    const { id, attemptQuestionId } = responseParams.parse(req.params);
+    const body = saveResponseSchema.parse(req.body);
+    res.json(await saveAnswer(req.auth!.userId, id, attemptQuestionId, body));
+  } catch (err) {
+    next(err);
+  }
+});
+
+attemptsRouter.post('/:id/continue', async (req, res, next) => {
+  try {
+    const { id } = attemptIdParam.parse(req.params);
+    await continueSection(req.auth!.userId, id);
     res.json(await getAttemptView(req.auth!.userId, id));
   } catch (err) {
     next(err);
