@@ -1,6 +1,7 @@
 import "dotenv/config";
 import bcrypt from "bcryptjs";
 import { prisma } from "../lib/prisma.js";
+import { EXAM_QUESTIONS } from "./examBank.js";
 
 type Q = {
   stem: string;
@@ -15,6 +16,13 @@ type Q = {
   bloom: string;
   skill: string;
 };
+
+/** IRT b-parameter -> human difficulty label. */
+function labelForDifficulty(b: number): "EASY" | "MEDIUM" | "HARD" {
+  if (b < -0.5) return "EASY";
+  if (b <= 0.5) return "MEDIUM";
+  return "HARD";
+}
 
 const CONCEPTS: {
   slug: string;
@@ -635,10 +643,31 @@ async function main() {
       },
       {
         type: "EXAM",
-        name: "SSC CGL Quantitative Aptitude (placeholder)",
-        slug: "ssc-cgl-quant",
-        description: "Reserved target — this prototype seeds DSA, not SSC items.",
-        domain: "QUANT",
+        name: "SSC CGL",
+        slug: "ssc-cgl",
+        description: "Quant, Reasoning, English and General Awareness for SSC CGL.",
+        domain: "SSC_CGL",
+      },
+      {
+        type: "EXAM",
+        name: "Class 10 (CBSE)",
+        slug: "class-10",
+        description: "Maths, Science, English and Social Science for Class 10 boards.",
+        domain: "CLASS_10",
+      },
+      {
+        type: "EXAM",
+        name: "Class 12 (CBSE)",
+        slug: "class-12",
+        description: "Physics, Chemistry, Mathematics and Computer Science for Class 12.",
+        domain: "CLASS_12",
+      },
+      {
+        type: "EXAM",
+        name: "BTech IT / CSE",
+        slug: "btech-it",
+        description: "DBMS, OS, DSA, CN and Software Engineering for engineering placements.",
+        domain: "BTECH",
       },
     ].map((t) => prisma.target.create({ data: t }))
   );
@@ -663,12 +692,16 @@ async function main() {
         optionsJson: JSON.stringify(item.options),
         correctIndex: item.correct,
         explanation: item.explanation,
+        examCategory: "SKILL",
+        examName: "DSA",
+        subject: "DSA",
         topic: item.topic,
         subtopic: item.subtopic,
+        difficultyLabel: labelForDifficulty(item.difficulty),
         conceptId: bySlug[item.concept].id,
         difficulty: item.difficulty,
         discrimination: item.discrimination,
-        tagsJson: JSON.stringify([item.topic, item.subtopic]),
+        tagsJson: JSON.stringify(["DSA", item.topic, item.subtopic]),
       },
     });
     await prisma.questionMetadata.create({
@@ -679,6 +712,59 @@ async function main() {
         prereqJson: JSON.stringify([]),
       },
     });
+  }
+
+  // ---- Curated exam banks: SSC CGL / Class 10 / Class 12 / BTech ----
+  // Each subject gets a lightweight knowledge concept so mastery tracking and
+  // the knowledge graph also work for non-DSA exams.
+  const conceptCache = new Map<string, string>();
+  let examCount = 0;
+  for (const item of EXAM_QUESTIONS) {
+    const slug = `${item.examName.toLowerCase()}-${item.subject.toLowerCase().replace(/[^a-z0-9]+/g, "-")}`;
+    let conceptId = conceptCache.get(slug);
+    if (!conceptId) {
+      const existing = await prisma.knowledgeConcept.findUnique({ where: { slug } });
+      const concept =
+        existing ??
+        (await prisma.knowledgeConcept.create({
+          data: {
+            slug,
+            name: item.subject,
+            domain: item.examName,
+            description: `${item.subject} for ${item.examName}`,
+            dimension: "knowledge",
+          },
+        }));
+      conceptId = concept.id;
+      conceptCache.set(slug, conceptId);
+    }
+    const created = await prisma.question.create({
+      data: {
+        stem: item.stem,
+        optionsJson: JSON.stringify(item.options),
+        correctIndex: item.correct,
+        explanation: item.explanation,
+        examCategory: item.examCategory,
+        examName: item.examName,
+        subject: item.subject,
+        topic: item.topic,
+        subtopic: item.topic,
+        difficultyLabel: item.difficultyLabel,
+        conceptId,
+        difficulty: item.difficulty,
+        discrimination: 1.1,
+        tagsJson: JSON.stringify([item.examName, item.subject, item.topic]),
+      },
+    });
+    await prisma.questionMetadata.create({
+      data: {
+        questionId: created.id,
+        bloomLevel: item.bloom,
+        skillType: item.skill,
+        prereqJson: JSON.stringify([]),
+      },
+    });
+    examCount += 1;
   }
 
   for (const b of [
@@ -734,7 +820,9 @@ async function main() {
     });
   }
 
-  console.log(`Seeded ${questions.length} questions, ${conceptRows.length} concepts. Demo: demo@omniassess.dev / password123`);
+  console.log(
+    `Seeded ${questions.length} DSA + ${examCount} exam questions across ${conceptRows.length + conceptCache.size} concepts. Demo: demo@omniassess.dev / password123`
+  );
 }
 
 main()

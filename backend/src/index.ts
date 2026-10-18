@@ -9,6 +9,8 @@ import { assessmentRouter } from "./routes/assessments.js";
 import { analyticsRouter } from "./routes/analytics.js";
 import { interviewRouter } from "./routes/interview.js";
 import { proctorRouter } from "./routes/proctoring.js";
+import { preferencesRouter } from "./routes/preferences.js";
+import { skillGapRouter } from "./routes/skillGap.js";
 
 const app = express();
 const frontendOrigin = process.env.FRONTEND_ORIGIN || "http://localhost:5173";
@@ -54,6 +56,8 @@ app.use("/api/assessments", assessmentRouter);
 app.use("/api/analytics", analyticsRouter);
 app.use("/api/interview", interviewRouter);
 app.use("/api/proctoring", proctorRouter);
+app.use("/api/preferences", preferencesRouter);
+app.use("/api/analytics/skill-gap", skillGapRouter);
 
 // ---- One-service mode: serve the built frontend from the same port ----
 // Local dev still uses Vite (5173), but `npm start` / Vercel / single deploys

@@ -1,5 +1,6 @@
 import { useQuery } from "@tanstack/react-query";
 import { Link, useNavigate } from "react-router-dom";
+import { useState } from "react";
 import { PolarAngleAxis, PolarGrid, PolarRadiusAxis, Radar, RadarChart, ResponsiveContainer, Tooltip, LineChart, Line, XAxis, YAxis, CartesianGrid } from "recharts";
 import { api } from "../lib/api";
 import { useAuth } from "../store/auth";
@@ -7,21 +8,36 @@ import { useAuth } from "../store/auth";
 export default function Dashboard() {
   const nav = useNavigate();
   const user = useAuth((s) => s.user);
-  const { data, isLoading, error } = useQuery({
+  const [actionError, setActionError] = useState("");
+  const { data, isLoading, error, refetch, isFetching } = useQuery({
     queryKey: ["dash"],
     queryFn: () => api<any>("/api/analytics/dashboard"),
+    retry: 1,
   });
 
   async function start(mode: "ADAPTIVE" | "FIXED" | "DAILY_CHALLENGE") {
-    const r = await api<any>("/api/assessments/start", {
-      method: "POST",
-      body: JSON.stringify({ mode }),
-    });
-    nav(`/app/assess/${r.assessment.id}`);
+    setActionError("");
+    try {
+      const r = await api<any>("/api/assessments/start", {
+        method: "POST",
+        body: JSON.stringify({ mode }),
+      });
+      nav(`/app/assess/${r.assessment.id}`);
+    } catch (e: any) {
+      setActionError(e.message || "Could not start assessment");
+    }
   }
 
   if (isLoading) return <p className="text-slate-400">Loading dashboard…</p>;
-  if (error) return <p className="text-rose-400">{(error as Error).message}</p>;
+  if (error)
+    return (
+      <div className="max-w-2xl space-y-3">
+        <h1 className="font-display text-4xl text-white">Dashboard unavailable</h1>
+        <p className="text-sm text-rose-400">Could not load: {(error as Error).message}</p>
+        <p className="text-xs text-slate-500">Is the backend running? Run npm run dev from the repo root, then retry.</p>
+        <button className="btn-ghost" onClick={() => refetch()} disabled={isFetching}>{isFetching ? "Retrying…" : "Retry"}</button>
+      </div>
+    );
 
   const heat = (data.heatmap || []) as { date: string; count: number }[];
   const max = Math.max(1, ...heat.map((h) => h.count));
@@ -45,6 +61,7 @@ export default function Dashboard() {
           <button className="btn-ghost" onClick={() => nav("/app/practice")}>Practice Arena</button>
         </div>
       </div>
+      {actionError && <p className="text-sm text-rose-400">{actionError}</p>}
 
       <div className="grid gap-4 md:grid-cols-4">
         {[

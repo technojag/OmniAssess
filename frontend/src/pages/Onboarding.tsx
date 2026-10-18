@@ -31,12 +31,16 @@ export default function Onboarding() {
   const [skillArea, setSkillArea] = useState("React, JavaScript");
   const [customFocus, setCustomFocus] = useState("");
   const [error, setError] = useState("");
+  const [targetsError, setTargetsError] = useState("");
 
   useEffect(() => {
-    api<{ targets: any[] }>("/api/targets").then((r) => {
-      setTargets(r.targets);
-      setTargetId(r.targets[0]?.id || "");
-    });
+    setTargetsError("");
+    api<{ targets: any[] }>("/api/targets")
+      .then((r) => {
+        setTargets(r.targets);
+        setTargetId(r.targets[0]?.id || "");
+      })
+      .catch((e: any) => setTargetsError(e.message || "Could not load targets. Is the backend running?"));
   }, []);
 
   async function onSubmit(e: FormEvent) {
@@ -89,6 +93,7 @@ export default function Onboarding() {
       )}
       {step === 2 && (
         <div className="card space-y-3 p-5">
+          {targetsError && <p className="text-sm text-rose-400">{targetsError}</p>}
           {category === "SCHOOL" && (
             <div className="grid grid-cols-2 gap-3">
               <label className="text-sm text-slate-400">Class<input className="input mt-1" value={classLevel} onChange={(e) => setClassLevel(e.target.value)} /></label>

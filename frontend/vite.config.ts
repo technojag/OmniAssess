@@ -3,8 +3,9 @@ import react from "@vitejs/plugin-react";
 
 export default defineConfig({
   plugins: [react()],
-  // Relative asset URLs allow the built SPA to be opened from dist/index.html.
-  base: "./",
+  // Absolute asset URLs (base "/") so deep SPA routes like /app/assessments
+  // resolve /assets/... correctly. Relative "./" broke every page except /app.
+  base: "/",
   server: { port: 5173 },
   test: { environment: "jsdom" },
 });

@@ -88,29 +88,133 @@ JSON: {"title": string, "summary": string, "days": [{"day": number, "focus": str
   );
 }
 
-export async function interviewReply(history: { role: string; content: string }[], mode: string) {
-  const last = history.filter((h) => h.role === "user").slice(-1)[0]?.content || "";
-  const fallbackQ =
-    mode === "HR"
-      ? "Tell me about a time you disagreed with a teammate and how you resolved it."
-      : "How would you detect a cycle in a linked list, and what is the time/space tradeoff?";
-  const evalFallback = {
-    relevance: last ? 0.55 : 0.2,
-    structure: last ? 0.5 : 0.2,
-    depth: last ? 0.45 : 0.2,
-    notes: "Heuristic evaluation without a live LLM.",
+export type ExamQuestionDraft = {
+  question: string;
+  options: string[];
+  answerIndex: number;
+  explanation: string;
+};
+
+export type ExamQuestionRequest = {
+  examCategory: string;
+  examName: string;
+  subject: string;
+  topic: string;
+  difficulty: "EASY" | "MEDIUM" | "HARD" | "MIXED";
+};
+
+/**
+ * Exam-aware generation. The exam hierarchy is always part of the prompt so a
+ * question can never drift outside its exam/subject/topic/difficulty slice.
+ */
+export async function generateExamQuestion(input: ExamQuestionRequest) {
+  const fallbackData = buildFallbackExamQuestion(input);
+  return generateJson<ExamQuestionDraft>(
+    `You are OmniAssess AI, an exam question author.
+Exam category: ${input.examCategory}
+Exam: ${input.examName}
+Subject: ${input.subject}
+Topic: ${input.topic}
+Difficulty: ${input.difficulty}
+
+Write ONE single-correct-answer MCQ strictly inside this exam, subject and topic.
+Return JSON only with this exact shape:
+{"question": string, "options": string[4], "answerIndex": number, "explanation": string}
+Rules: exactly 4 believable options, answerIndex is 0-3, the explanation justifies the correct option in one or two sentences. Do not reference other exams or subjects.`,
+    fallbackData
+  );
+}
+
+function buildFallbackExamQuestion(input: ExamQuestionRequest): ExamQuestionDraft {
+  const topic = input.topic || input.subject;
+  return {
+    question: `[${input.examName} · ${input.subject} · ${topic} · ${input.difficulty}] Which statement is most accurate about "${topic}"?`,
+    options: [
+      `It is a core concept of ${topic} within ${input.subject}.`,
+      `It belongs to an unrelated subject and is not assessed in ${input.examName}.`,
+      "It has no measurable definition in this syllabus.",
+      "It is only relevant outside the exam syllabus.",
+    ],
+    answerIndex: 0,
+    explanation: `Deterministic fallback: "${topic}" is part of the ${input.subject} syllabus for ${input.examName}. Set GEMINI_API_KEY for a real, exam-specific item.`,
   };
+}
+
+export type InterviewContext = {
+  categoryId: string;
+  categoryLabel: string;
+  examName: string;
+  subject: string;
+  interviewerRole: string;
+  interviewFocus: string[];
+  rubric: { key: string; label: string; hint: string }[];
+  openingQuestions: string[];
+};
+
+/**
+ * Category-aware interview. Questions, follow-ups and the evaluation rubric all
+ * come from the selected category, so technical and SSC CGL sessions never mix.
+ */
+export async function interviewReply(history: { role: string; content: string }[], ctx: InterviewContext) {
+  const rubricJson = ctx.rubric.map((r) => `"${r.key}": number`).join(", ");
+  const focus = ctx.interviewFocus.join("; ");
+  const opening = ctx.openingQuestions[0];
+  const isFirst = history.filter((h) => h.role === "user").length === 0;
+
+  const fallbackQ = isFirst ? opening : `Follow-up: can you go deeper on that, with a concrete example? (${opening})`;
+  const baseScore = Math.min(0.85, 0.25 + history.filter((h) => h.role === "user").length * 0.12);
+  const evalFallback: Record<string, number> = {};
+  for (const r of ctx.rubric) evalFallback[r.key] = Number(baseScore.toFixed(2));
+
   const fb = {
-    reply: history.length < 2 ? `Let's begin this ${mode} interview. ${fallbackQ}` : `Follow-up: can you add complexity analysis or an example? (${fallbackQ})`,
+    reply: isFirst
+      ? `Welcome to your ${ctx.categoryLabel} interview. Let's begin. ${fallbackQ}`
+      : `Thank you. ${fallbackQ}`,
     evaluation: evalFallback,
+    weakAreas: [],
+    suggestions: [`Answered ${history.filter((h) => h.role === "user").length + 1} question(s) in ${ctx.categoryLabel}. Add a concrete example to each point.`],
   };
-  return generateJson(
-    `You are an interviewer in ${mode} mode for a software developer role.
-Conversation: ${JSON.stringify(history.slice(-8))}
-JSON: {"reply": string, "evaluation": {"relevance": number, "structure": number, "depth": number, "notes": string}}
-Scores 0-1.`,
+
+  return generateJson<{
+    reply: string;
+    evaluation: Record<string, number | string>;
+    weakAreas: string[];
+    suggestions: string[];
+  }>(
+    `You are ${ctx.interviewerRole}.
+Category: ${ctx.categoryLabel} (exam ${ctx.examName}${ctx.subject ? `, subject ${ctx.subject}` : ""}).
+Assess ONLY these areas: ${focus}
+
+Conversation so far: ${JSON.stringify(history.slice(-8))}
+
+Ask ONE next question that stays strictly inside this category${ctx.subject ? ` and subject (${ctx.subject})` : ""}. Do not ask about other exams or unrelated domains.
+Return JSON only:
+{"reply": string, "evaluation": {${rubricJson}, "notes": string}, "weakAreas": string[], "suggestions": string[]}
+All score values are 0-1. weakAreas and suggestions must reference this category only.`,
     fb
   );
+}
+
+/** Aggregate rubric scores across turns into a final interview verdict. */
+export function summarizeInterview(
+  evaluations: { evaluation: Record<string, unknown> }[],
+  ctx: InterviewContext
+) {
+  const dims = ctx.rubric.map((r) => {
+    const values = evaluations
+      .map((e) => e.evaluation[r.key])
+      .filter((v): v is number => typeof v === "number");
+    const avg = values.length ? values.reduce((a, b) => a + b, 0) / values.length : 0;
+    return { key: r.key, label: r.label, hint: r.hint, score: Number(avg.toFixed(2)), samples: values.length };
+  });
+  const overall = dims.length
+    ? Number((dims.reduce((s, d) => s + d.score, 0) / dims.length).toFixed(2))
+    : 0;
+  const weakAreas = dims
+    .filter((d) => d.samples > 0 && d.score < 0.6)
+    .map((d) => `${d.label} (${(d.score * 100).toFixed(0)}%)`);
+  const strongAreas = dims.filter((d) => d.samples > 0 && d.score >= 0.75).map((d) => d.label);
+  return { overall, dimensions: dims, weakAreas, strongAreas, rubric: ctx.rubric };
 }
 
 function buildFallbackNarrative(input: {

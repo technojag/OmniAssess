@@ -9,18 +9,29 @@ import { explainWeaknesses, generateStudyPlan } from "../ai/llm.js";
 import { combineReadiness, counterfactual } from "../engine/readiness.js";
 import { awardActivity, recordDaily } from "../services/gamification.js";
 import { callMlTheta } from "../services/mlClient.js";
+import { ensureExamBank, buildExamFilter, type ExamScope } from "../engine/questionBank.js";
+import { EXAMS, getExam, isValidSubject, normalizeExamSelection, resolveActiveSelection } from "../engine/exams.js";
 
 export const assessmentRouter = Router();
 assessmentRouter.use(auth);
 
+const startSchema = z.object({
+  mode: z.enum(["FIXED", "ADAPTIVE", "DAILY_CHALLENGE", "PRACTICE"]).default("ADAPTIVE"),
+  maxQuestions: z.number().int().min(4).max(30).optional(),
+  practice: z.boolean().optional().default(false),
+  examName: z.string().max(40).optional(),
+  category: z.string().max(30).optional(),
+  subject: z.string().max(80).optional(),
+  topic: z.string().max(80).optional(),
+  difficulty: z.enum(["EASY", "MEDIUM", "HARD", "MIXED"]).optional(),
+});
+
+assessmentRouter.get("/exams", (_req, res) => {
+  res.json({ exams: EXAMS, note: "Exam -> Subject -> Topic hierarchy used for all question retrieval." });
+});
+
 assessmentRouter.post("/start", async (req, res) => {
-  const parsed = z
-    .object({
-      mode: z.enum(["FIXED", "ADAPTIVE", "DAILY_CHALLENGE", "PRACTICE"]).default("ADAPTIVE"),
-      maxQuestions: z.number().int().min(4).max(30).optional(),
-      practice: z.boolean().optional().default(false),
-    })
-    .safeParse(req.body ?? {});
+  const parsed = startSchema.safeParse(req.body ?? {});
   if (!parsed.success) {
     res.status(400).json({ error: parsed.error.flatten() });
     return;
@@ -29,6 +40,12 @@ assessmentRouter.post("/start", async (req, res) => {
   const isPractice = parsed.data.mode === "PRACTICE" || parsed.data.practice === true;
   const maxQuestions = parsed.data.maxQuestions ?? (parsed.data.mode === "DAILY_CHALLENGE" ? 4 : 12);
   const durationSec = parsed.data.mode === "DAILY_CHALLENGE" ? 8 * 60 : 25 * 60;
+
+  // Exam -> Subject -> Topic -> Difficulty. Falls back to the user's onboarding
+  // context, then to the DSA default so legacy calls keep working.
+  const scope = await resolveScope(userId, parsed.data);
+  await ensureExamBank(scope, maxQuestions + 2);
+
   const assessment = await prisma.assessment.create({
     data: {
       userId,
@@ -36,17 +53,77 @@ assessmentRouter.post("/start", async (req, res) => {
       maxQuestions,
       durationSec,
       isPractice,
-      sessions: { create: { timeLeftSec: durationSec, theta: 0 } },
+      examCategory: scope.examCategory,
+      examName: scope.examName,
+      subject: scope.subject,
+      topic: scope.topic,
+      difficulty: scope.difficulty,
+      sessions: { create: { timeLeftSec: durationSec, theta: 0, status: "ACTIVE" } },
     },
     include: { sessions: true },
   });
-  const first = await pickQuestion(assessment.id, parsed.data.mode, 0, userId);
+  const first = await pickQuestion(assessment.id, parsed.data.mode, 0, userId, [], scope);
   res.json({
     assessment,
     question: first,
+    scope,
     meta: { engine: "IRT-inspired adaptive assessment prototype", maxQuestions },
   });
 });
+
+async function resolveScope(
+  userId: string,
+  input: { examName?: string; category?: string; subject?: string; topic?: string; difficulty?: string }
+) {
+  const profile = await prisma.userProfile.findUnique({ where: { userId } });
+  const hasExplicit = Boolean(input.examName || input.category);
+  if (hasExplicit || profile?.examName) {
+    const r = resolveActiveSelection(profile, {
+      category: input.category,
+      examName: input.examName,
+      subject: input.subject,
+    });
+    return normalizeExamSelection({
+      examName: r.exam.examName,
+      subject: r.subject,
+      topic: input.topic,
+      difficulty: input.difficulty,
+    });
+  }
+  // Legacy path: derive the exam from the onboarding intake fields.
+  const guess = profile ? mapProfileToExam(profile) : null;
+  return normalizeExamSelection({
+    examName: guess || undefined,
+    subject: input.subject,
+    topic: input.topic,
+    difficulty: input.difficulty,
+  });
+}
+
+function mapProfileToExam(profile: {
+  category: string;
+  govExam: string | null;
+  degree: string | null;
+  domain: string | null;
+  classLevel: string | null;
+}): string | null {
+  if (profile.category === "GOVT" && profile.govExam) {
+    const slug = profile.govExam.toUpperCase().replace(/[^A-Z0-9]+/g, "_").replace(/^_|_$/g, "");
+    if (getExam(slug)) return slug;
+    if (slug.includes("SSC_CGL")) return "SSC_CGL";
+  }
+  if (profile.category === "COLLEGE") {
+    const degree = (profile.degree || "").toLowerCase();
+    const domain = (profile.domain || "").toLowerCase();
+    if (degree.includes("b.tech") || degree.includes("btech") || degree.includes("b.e")) return "BTECH";
+    if (domain.includes("computer") || domain.includes("it")) return "BTECH";
+  }
+  if (profile.category === "SCHOOL") {
+    if (profile.classLevel === "10") return "CLASS_10";
+    if (profile.classLevel === "12") return "CLASS_12";
+  }
+  return null;
+}
 
 assessmentRouter.get("/:id", async (req, res) => {
   const a = await loadOwned(req, res);
@@ -58,14 +135,27 @@ assessmentRouter.get("/:id/current", async (req, res) => {
   const a = await loadOwned(req, res);
   if (!a) return;
   const session = a.sessions[0];
+  if (a.status === "TERMINATED" || session?.status === "TERMINATED") {
+    res.json({
+      terminated: true,
+      reason: a.terminateReason || "Assessment terminated due to repeated proctoring violations.",
+      assessment: a,
+      session,
+      question: null,
+    });
+    return;
+  }
+  const scope = scopeOf(a);
   const seen: string[] = JSON.parse(session.seenJson);
   const lastId = seen[seen.length - 1];
   const q = lastId
     ? await prisma.question.findUnique({ where: { id: lastId }, include: { concept: true, metadata: true } })
-    : await pickQuestion(a.id, a.mode, session.theta, a.userId);
+    : await pickQuestion(a.id, a.mode, session.theta, a.userId, [], scope);
   res.json({
     question: publicQuestion(q),
     session,
+    scope,
+    assessment: { examName: a.examName, subject: a.subject, topic: a.topic, difficulty: a.difficulty, examCategory: a.examCategory },
     progress: { answered: a.attempts.length, max: a.maxQuestions },
   });
 });
@@ -74,7 +164,11 @@ assessmentRouter.post("/:id/answer", async (req, res) => {
   const a = await loadOwned(req, res);
   if (!a) return;
   if (a.status !== "IN_PROGRESS") {
-    res.status(400).json({ error: "Assessment already completed" });
+    res.status(409).json({
+      error: a.status === "TERMINATED" ? "Assessment was terminated by proctoring" : "Assessment already completed",
+      terminated: a.status === "TERMINATED",
+      reason: a.terminateReason || null,
+    });
     return;
   }
   const parsed = z
@@ -192,7 +286,7 @@ assessmentRouter.post("/:id/answer", async (req, res) => {
 
   const done = seen.length >= a.maxQuestions;
   let next = null;
-  if (!done) next = await pickQuestion(a.id, a.mode, thetaAfter, a.userId, seen);
+  if (!done) next = await pickQuestion(a.id, a.mode, thetaAfter, a.userId, seen, scopeOf(a));
 
   res.json({
     isCorrect,
@@ -218,6 +312,10 @@ assessmentRouter.post("/:id/answer", async (req, res) => {
 assessmentRouter.post("/:id/complete", async (req, res) => {
   const a = await loadOwned(req, res);
   if (!a) return;
+  if (a.status === "TERMINATED") {
+    res.status(409).json({ error: "Assessment was terminated by proctoring", terminated: true, reason: a.terminateReason });
+    return;
+  }
   const attempts = await prisma.questionAttempt.findMany({
     where: { assessmentId: a.id },
     include: { question: { include: { concept: true } } },
@@ -292,6 +390,10 @@ assessmentRouter.post("/:id/complete", async (req, res) => {
       thetaEnd: ml?.theta ?? local.theta,
     },
   });
+  await prisma.assessmentSession.updateMany({
+    where: { assessmentId: a.id },
+    data: { status: "COMPLETED" },
+  });
 
   const report = await prisma.intelligenceReport.create({
     data: {
@@ -358,6 +460,13 @@ assessmentRouter.post("/:id/complete", async (req, res) => {
 
   res.json({
     scorePct,
+    exam: {
+      examCategory: a.examCategory,
+      examName: a.examName,
+      subject: a.subject,
+      topic: a.topic,
+      difficulty: a.difficulty,
+    },
     theta: { local, ml, label: "IRT-inspired EAP estimate (prototype)" },
     topics,
     report: {
@@ -471,13 +580,33 @@ async function loadOwned(req: Parameters<typeof auth>[0] extends never ? never :
   return a;
 }
 
+/** Extract the persisted exam slice from an assessment row. */
+function scopeOf(a: {
+  examName: string;
+  subject: string;
+  topic: string;
+  difficulty: string;
+  examCategory: string;
+}): ExamScope {
+  return {
+    examCategory: a.examCategory,
+    examName: a.examName,
+    subject: a.subject,
+    topic: a.topic,
+    difficulty: a.difficulty,
+  } as ExamScope;
+}
+
 async function pickQuestion(
   assessmentId: string,
   mode: string,
   theta: number,
   userId: string,
-  seen: string[] = []
+  seen: string[] = [],
+  scope?: ExamScope
 ) {
+  const scopeFilter = scope ? buildExamFilter(scope) : { active: true };
+
   if (mode === "DAILY_CHALLENGE") {
     const states = await prisma.knowledgeState.findMany({
       where: { userId },
@@ -486,16 +615,18 @@ async function pickQuestion(
     });
     const conceptIds = states.map((s) => s.conceptId);
     const pool = await prisma.question.findMany({
-      where: { active: true, conceptId: { in: conceptIds.length ? conceptIds : undefined }, id: { notIn: seen } },
+      where: {
+        ...scopeFilter,
+        conceptId: { in: conceptIds.length ? conceptIds : undefined },
+        id: { notIn: seen },
+      },
       include: { concept: true, metadata: true },
     });
-    return pool[Math.floor(Math.random() * pool.length)] || pool[0] || null;
+    const scoped = pool.length ? pool : await scopedPool(scopeFilter, seen);
+    return scoped[Math.floor(Math.random() * scoped.length)] || scoped[0] || null;
   }
 
-  const pool = await prisma.question.findMany({
-    where: { active: true, id: { notIn: seen } },
-    include: { concept: true, metadata: true },
-  });
+  const pool = await scopedPool(scopeFilter, seen);
   if (mode === "FIXED") {
     return pool.sort((a, b) => a.difficulty - b.difficulty)[seen.length] || pool[0] || null;
   }
@@ -516,19 +647,38 @@ async function pickQuestion(
   return selected || pool[0] || null;
 }
 
+/** Exam-scoped pool, relaxing the difficulty filter if it would return nothing. */
+async function scopedPool(filter: Record<string, unknown>, seen: string[]) {
+  const strict = await prisma.question.findMany({
+    where: { ...filter, id: { notIn: seen } },
+    include: { concept: true, metadata: true },
+  });
+  if (strict.length) return strict;
+  const relaxed = { ...filter };
+  delete (relaxed as { difficulty?: unknown }).difficulty;
+  return prisma.question.findMany({
+    where: { ...relaxed, id: { notIn: seen } },
+    include: { concept: true, metadata: true },
+  });
+}
+
 function publicQuestion(q: any) {
   if (!q) return null;
   return {
     id: q.id,
     stem: q.stem,
     options: JSON.parse(q.optionsJson),
+    examName: q.examName,
+    examCategory: q.examCategory,
+    subject: q.subject,
     topic: q.topic,
     subtopic: q.subtopic,
+    difficultyLabel: q.difficultyLabel,
     difficulty: q.difficulty,
     bloomLevel: q.metadata?.bloomLevel || "UNDERSTAND",
     skillType: q.metadata?.skillType || q.type,
     timeLimitSec: q.timeLimitSec,
     concept: q.concept,
-    engineNote: "Adaptive selection weighs ability, mastery, review urgency, and question difficulty.",
+    engineNote: "Adaptive selection weighs ability, mastery, review urgency, and question difficulty inside your selected exam.",
   };
 }

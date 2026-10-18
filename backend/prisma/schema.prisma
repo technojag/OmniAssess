@@ -55,6 +55,11 @@ model UserProfile {
   govSection      String?
   targetRole      String?
   skillArea       String?
+  // ---- Centralized active exam/category selection (drives Skill Gap,
+  //      AI Interview, Practice Arena, assessment defaults and analytics) ----
+  examCategory    String   @default("TECHNICAL")
+  examName        String?  // e.g. SSC_CGL, CLASS_10, BTECH, DSA
+  subject         String?  // preferred subject inside the active exam
   customFocus     String   @default("")
   candidateContextJson String @default("{}")
   createdAt       DateTime @default(now())
@@ -115,8 +120,13 @@ model Question {
   correctIndex    Int
   explanation     String
   type            String   @default("MCQ")
+  // ---- Universal exam hierarchy: Exam -> Subject -> Topic -> Difficulty ----
+  examCategory    String   @default("SKILL")
+  examName        String   @default("DSA")
+  subject         String   @default("DSA")
   topic           String
   subtopic        String
+  difficultyLabel String   @default("MEDIUM")
   conceptId       String
   concept         KnowledgeConcept @relation(fields: [conceptId], references: [id])
   difficulty      Float
@@ -150,6 +160,14 @@ model Assessment {
   mode         String
   status       String              @default("IN_PROGRESS")
   targetSlug   String?
+  // ---- Universal exam hierarchy carried end-to-end ----
+  examCategory String              @default("SKILL")
+  examName     String              @default("DSA")
+  subject      String              @default("DSA")
+  topic        String              @default("Mixed")
+  difficulty   String              @default("MIXED")
+  terminateReason String?
+  terminatedAt DateTime?
   startedAt    DateTime            @default(now())
   completedAt  DateTime?
   durationSec  Int                 @default(1800)
@@ -169,6 +187,8 @@ model AssessmentSession {
   id            String     @id @default(cuid())
   assessmentId  String
   assessment    Assessment @relation(fields: [assessmentId], references: [id], onDelete: Cascade)
+  status        String     @default("ACTIVE") // ACTIVE | WARNING | TERMINATED | COMPLETED
+  warningLevel  Int        @default(0)
   currentIndex  Int        @default(0)
   theta         Float      @default(0)
   seenJson      String     @default("[]")
@@ -293,6 +313,10 @@ model InterviewSession {
   userId      String
   user        User            @relation(fields: [userId], references: [id], onDelete: Cascade)
   mode        String
+  // ---- Category context so an interview never mixes exam domains ----
+  examCategory String         @default("TECHNICAL")
+  examName     String?
+  subject      String?
   status      String          @default("ACTIVE")
   startedAt   DateTime        @default(now())
   endedAt     DateTime?

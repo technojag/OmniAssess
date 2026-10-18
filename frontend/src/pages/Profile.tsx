@@ -5,18 +5,38 @@ import { useAuth } from "../store/auth";
 
 export default function Profile() {
   const user = useAuth((s) => s.user);
-  const { data } = useQuery({ queryKey: ["dash-profile"], queryFn: () => api<any>("/api/analytics/dashboard") });
+  const { data, isLoading, error, refetch, isFetching } = useQuery({
+    queryKey: ["dash-profile"],
+    queryFn: () => api<any>("/api/analytics/dashboard"),
+    retry: 1,
+  });
   const [docText, setDocText] = useState("React Node.js MongoDB REST APIs Trees Recursion");
   const [docResult, setDocResult] = useState<any>(null);
+  const [docError, setDocError] = useState("");
   const profile = data?.profile || {};
 
   async function upload() {
-    const r = await api<any>("/api/analytics/documents", {
-      method: "POST",
-      body: JSON.stringify({ filename: "resume.txt", kind: "RESUME", text: docText }),
-    });
-    setDocResult(r.document.analysis);
+    setDocError("");
+    try {
+      const r = await api<any>("/api/analytics/documents", {
+        method: "POST",
+        body: JSON.stringify({ filename: "resume.txt", kind: "RESUME", text: docText }),
+      });
+      setDocResult(r.document.analysis);
+    } catch (e: any) {
+      setDocError(e.message || "Could not analyze document. Is the backend running?");
+    }
   }
+
+  if (isLoading) return <p className="text-slate-400">Loading profile…</p>;
+  if (error)
+    return (
+      <div className="max-w-2xl space-y-3">
+        <h1 className="font-display text-4xl text-white">Profile unavailable</h1>
+        <p className="text-sm text-rose-400">Could not load: {(error as Error).message}</p>
+        <button className="btn-ghost" onClick={() => refetch()} disabled={isFetching}>{isFetching ? "Retrying…" : "Retry"}</button>
+      </div>
+    );
 
   return (
     <div className="max-w-4xl space-y-5">
@@ -34,6 +54,7 @@ export default function Profile() {
         <p className="text-xs text-slate-500">Paste resume or syllabus text. The system extracts topics and suggests a personalized assessment. No fake parsing claims.</p>
         <textarea className="input min-h-24" value={docText} onChange={(e) => setDocText(e.target.value)} />
         <button className="btn-primary" onClick={upload}>Analyze document</button>
+        {docError && <p className="text-sm text-rose-400">{docError}</p>}
         {docResult && (
           <div className="text-sm text-slate-300">
             <div>Matched: {(docResult.matchedConcepts || []).map((m: any) => m.name).join(", ") || "none"}</div>
