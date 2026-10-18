@@ -5,6 +5,7 @@ import { attemptIdParam, responseParams, saveResponseSchema, startAttemptSchema 
 import { getReview, getSummary } from './attempts.result';
 import { continueSection, getAttemptView, saveAnswer, startOrResume } from './attempts.service';
 import { submitExam } from './attempts.submit';
+import { getTiming, recordQuestionView, viewEventSchema } from './attempts.timing';
 
 export const attemptsRouter = Router();
 
@@ -35,6 +36,16 @@ attemptsRouter.put('/:id/responses/:attemptQuestionId', async (req, res, next) =
     const { id, attemptQuestionId } = responseParams.parse(req.params);
     const body = saveResponseSchema.parse(req.body);
     res.json(await saveAnswer(req.auth!.userId, id, attemptQuestionId, body));
+  } catch (err) {
+    next(err);
+  }
+});
+
+attemptsRouter.post('/:id/events/view', async (req, res, next) => {
+  try {
+    const { id } = attemptIdParam.parse(req.params);
+    const { attemptQuestionId } = viewEventSchema.parse(req.body);
+    res.json(await recordQuestionView(req.auth!.userId, id, attemptQuestionId));
   } catch (err) {
     next(err);
   }
@@ -74,6 +85,15 @@ attemptsRouter.get('/:id/review', async (req, res, next) => {
   try {
     const { id } = attemptIdParam.parse(req.params);
     res.json(await getReview(req.auth!.userId, id));
+  } catch (err) {
+    next(err);
+  }
+});
+
+attemptsRouter.get('/:id/timing', async (req, res, next) => {
+  try {
+    const { id } = attemptIdParam.parse(req.params);
+    res.json(await getTiming(req.auth!.userId, id));
   } catch (err) {
     next(err);
   }
