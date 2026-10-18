@@ -2,6 +2,7 @@ import { Router } from 'express';
 import { requireAuth } from '../../middleware/require-auth';
 import { requireOnboarded } from '../../middleware/require-onboarded';
 import { attemptIdParam, responseParams, saveResponseSchema, startAttemptSchema } from './attempts.schemas';
+import { getProctoringLog, recordViolation, violationSchema } from './attempts.proctoring';
 import { getReview, getSummary } from './attempts.result';
 import { continueSection, getAttemptView, saveAnswer, startOrResume } from './attempts.service';
 import { submitExam } from './attempts.submit';
@@ -51,6 +52,16 @@ attemptsRouter.post('/:id/events/view', async (req, res, next) => {
   }
 });
 
+attemptsRouter.post('/:id/events/violation', async (req, res, next) => {
+  try {
+    const { id } = attemptIdParam.parse(req.params);
+    const { kind } = violationSchema.parse(req.body);
+    res.json(await recordViolation(req.auth!.userId, id, kind));
+  } catch (err) {
+    next(err);
+  }
+});
+
 attemptsRouter.post('/:id/continue', async (req, res, next) => {
   try {
     const { id } = attemptIdParam.parse(req.params);
@@ -94,6 +105,15 @@ attemptsRouter.get('/:id/timing', async (req, res, next) => {
   try {
     const { id } = attemptIdParam.parse(req.params);
     res.json(await getTiming(req.auth!.userId, id));
+  } catch (err) {
+    next(err);
+  }
+});
+
+attemptsRouter.get('/:id/proctoring', async (req, res, next) => {
+  try {
+    const { id } = attemptIdParam.parse(req.params);
+    res.json(await getProctoringLog(req.auth!.userId, id));
   } catch (err) {
     next(err);
   }

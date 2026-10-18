@@ -215,6 +215,8 @@ export async function getAttemptView(userId: string, attemptId: string) {
       isPractice: attempt.isPractice,
       startedAt: attempt.startedAt,
       submittedAt: attempt.submittedAt,
+            warningCount: attempt.warningCount,
+      integrityScore: attempt.integrityScore,
     },
     // true when a section just ended and the candidate must press Continue
     awaitingContinue: attempt.status === 'IN_PROGRESS' && !active,
