@@ -7,6 +7,7 @@ import { getReview, getSummary } from './attempts.result';
 import { continueSection, getAttemptView, saveAnswer, startOrResume } from './attempts.service';
 import { submitExam } from './attempts.submit';
 import { getTiming, recordQuestionView, viewEventSchema } from './attempts.timing';
+import { getUndoState, undoSubmit } from './attempts.undo';
 
 export const attemptsRouter = Router();
 
@@ -72,12 +73,30 @@ attemptsRouter.post('/:id/continue', async (req, res, next) => {
   }
 });
 
-// Submitting returns the SUMMARY (screen 1), not the answer key
+// Submitting returns the UNDO STATE. The score appears later, from GET /summary, once the undo window is closed.
 attemptsRouter.post('/:id/submit', async (req, res, next) => {
   try {
     const { id } = attemptIdParam.parse(req.params);
     await submitExam(req.auth!.userId, id);
-    res.json(await getSummary(req.auth!.userId, id));
+    res.json(await getUndoState(req.auth!.userId, id));
+  } catch (err) {
+    next(err);
+  }
+});
+
+attemptsRouter.get('/:id/undo', async (req, res, next) => {
+  try {
+    const { id } = attemptIdParam.parse(req.params);
+    res.json(await getUndoState(req.auth!.userId, id));
+  } catch (err) {
+    next(err);
+  }
+});
+
+attemptsRouter.post('/:id/undo', async (req, res, next) => {
+  try {
+    const { id } = attemptIdParam.parse(req.params);
+    res.json(await undoSubmit(req.auth!.userId, id));
   } catch (err) {
     next(err);
   }

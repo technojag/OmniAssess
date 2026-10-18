@@ -2,6 +2,7 @@ import { prisma } from '../../db';
 import { AppError } from '../../lib/errors';
 import { scoreAttempt, type ScoringSection } from '../exam-engine/scoring';
 import { loadAndSync } from './attempts.service';
+import { assertResultsVisible } from './attempts.undo';
 
 // Shared by summary and review. Only works once the exam has ended.
 async function loadScored(userId: string, attemptId: string) {
@@ -10,6 +11,7 @@ async function loadScored(userId: string, attemptId: string) {
     throw new AppError(409, 'ATTEMPT_IN_PROGRESS', 'Results are available after the exam ends.');
   }
 
+  await assertResultsVisible(userId, attemptId);
   const items = await prisma.attemptQuestion.findMany({
     where: { attemptId },
     orderBy: { position: 'asc' },
