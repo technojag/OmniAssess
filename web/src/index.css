@@ -1,0 +1,81 @@
+@import "tailwindcss";
+
+@custom-variant dark (&:where([data-theme="dark"], [data-theme="dark"] *));
+
+:root {
+  --bg: #F4F7FA;
+  --surface: #FFFFFF;
+  --text: #0F2233;
+  --muted: #4F6275;
+  --border: #D3DEE8;
+  --brand: #0166FC;
+  --brand-hover: #0050CC;
+  --brand-deep: #03225A;
+  --brand-soft: #E8F0FF;
+  --link: #0166FC;
+  --footer: #0F2A44;
+  --ok: #1E7B45;
+  --bad: #C0352B;
+  --mark: #6B46C1;
+  --warn: #B45309;
+  --crit: #B91C1C;
+}
+
+[data-theme="dark"] {
+  --bg: #0E1722;
+  --surface: #152233;
+  --text: #E6EEF6;
+  --muted: #9FB1C3;
+  --border: #25384D;
+  --brand: #0166FC;
+  --brand-hover: #2E80FF;
+  --brand-deep: #9CC2FF;
+  --brand-soft: #14284A;
+  --link: #6BA6FF;
+  --footer: #0A1A2E;
+  --ok: #3DB872;
+  --bad: #F0786E;
+  --mark: #A78BFA;
+  --warn: #F5B14A;
+  --crit: #FF8A8A;
+}
+
+@theme inline {
+  --color-bg: var(--bg);
+  --color-surface: var(--surface);
+  --color-text: var(--text);
+  --color-muted: var(--muted);
+  --color-border: var(--border);
+  --color-brand: var(--brand);
+  --color-brand-hover: var(--brand-hover);
+  --color-brand-deep: var(--brand-deep);
+  --color-brand-soft: var(--brand-soft);
+  --color-link: var(--link);
+  --color-footer: var(--footer);
+  --color-ok: var(--ok);
+  --color-bad: var(--bad);
+  --color-mark: var(--mark);
+  --color-warn: var(--warn);
+  --color-crit: var(--crit);
+  --font-sans: 'Noto Sans Variable', 'Noto Sans Devanagari Variable', system-ui, sans-serif;
+}
+
+html { color-scheme: light; }
+[data-theme="dark"] { color-scheme: dark; }
+
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--text);
+  font-family: var(--font-sans);
+}
+
+:focus-visible { outline: 2px solid var(--brand); outline-offset: 2px; }
+
+.theme-dark-only { display: none; }
+[data-theme="dark"] .theme-dark-only { display: inline; }
+[data-theme="dark"] .theme-light-only { display: none; }
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { animation-duration: 0.01ms !important; transition-duration: 0.01ms !important; }
+}
