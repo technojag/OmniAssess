@@ -1,0 +1,49 @@
+{
+  "nav": { "exams": "Exams", "practice": "Practice", "results": "Results", "how": "How it works" },
+  "header": {
+    "home": "OmniAssess home", "mainNav": "Main", "search": "Search", "logIn": "Log in", "getStarted": "Get started",
+    "language": "Language", "theme": "Change theme", "light": "Light", "dark": "Dark", "system": "System"
+  },
+  "journey": { "label": "Your journey", "learn": "Learn", "practice": "Practice", "review": "Review", "improve": "Improve", "succeed": "Succeed" },
+  "hero": {
+    "label": "Why OmniAssess",
+    "startFree": "Start free →",
+    "seeHow": "See how it works",
+    "works": "Works on your phone and on a laptop.",
+    "prev": "Previous slide",
+    "next": "Next slide",
+    "choose": "Choose a slide",
+    "show": "Show slide {{n}}",
+    "slideOf": "{{n}} of {{total}}",
+    "slides": [
+      {
+        "before": "Experience the exam ", "highlight": "before", "after": " you take it.",
+        "text": "Get familiar with real exam patterns, section timings and rules, so you walk into your actual exam with confidence.",
+        "alt": "A student taking a timed mock exam on a laptop, with a stopwatch and a list of exam sections where finished sections are locked."
+      },
+      {
+        "before": "See exactly where you ", "highlight": "lost marks.", "after": "",
+        "text": "A solution for every question, where you went wrong, and a clear plan to fix it.",
+        "alt": "A student thinking beside a detailed analysis card with a donut chart, correct and wrong rows, and a magnifying glass."
+      },
+      {
+        "before": "Watch your ", "highlight": "score climb,", "after": " attempt after attempt.",
+        "text": "Every attempt is compared with your last, so you can see the marks you gained.",
+        "alt": "A student celebrating in front of a rising score chart, a progress ring and a trophy."
+      }
+    ]
+  },
+  "search": {
+    "placeholder": "Search any exam", "title": "Exams", "available": "Available", "soon": "Coming soon",
+    "hint": "↑ ↓ to move · Enter to open · Esc to close · press / anywhere to search",
+    "noMatch": "No exam found for “{{q}}”",
+    "noMatchText": "We do not have it yet. Tell us which exam you need and we will add the most asked-for ones first.",
+    "examName": "Exam name", "send": "Send request",
+    "privacy": "We only use this to decide which exam to build next.",
+    "thanks": "Thank you. We have noted your request."
+  },
+  "exam": {
+    "notFound": "This exam page was not found.",
+    "soon": "The instructions screen for this exam is the next thing we are building."
+  }
+}

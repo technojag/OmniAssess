@@ -79,3 +79,10 @@ body {
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { animation-duration: 0.01ms !important; transition-duration: 0.01ms !important; }
 }
+.hero-slide {
+  background: var(--tint, var(--bg));
+  transition: background-color 0.5s;
+}
+[data-theme="dark"] .hero-slide {
+  background: var(--bg);
+}
