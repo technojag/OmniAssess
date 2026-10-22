@@ -2,7 +2,7 @@
   "nav": { "exams": "Exams", "practice": "Practice", "results": "Results", "how": "How it works" },
   "header": {
     "home": "OmniAssess home", "mainNav": "Main", "search": "Search", "logIn": "Log in", "getStarted": "Get started",
-    "language": "Language", "theme": "Change theme", "light": "Light", "dark": "Dark", "system": "System"
+    "language": "Language", "theme": "Change theme", "light": "Light", "dark": "Dark", "system": "System",     "menu": "Menu", "closeMenu": "Close menu"
   },
   "journey": { "label": "Your journey", "learn": "Learn", "practice": "Practice", "review": "Review", "improve": "Improve", "succeed": "Succeed" },
   "hero": {

@@ -1,0 +1,51 @@
+{
+  "benefits": {
+    "items": [
+      { "title": "Real section timers", "text": "Each section closes by itself" },
+      { "title": "A solution for every question", "text": "And where you went wrong" },
+      { "title": "English and Hindi", "text": "Choose before the exam" },
+      { "title": "Phone and laptop", "text": "Practise anywhere" }
+    ]
+  },
+  "how": {
+    "title": "How it works",
+    "steps": [
+      { "title": "Pick your exam and language", "text": "Choose the exam you are preparing for and whether you want the paper in English or Hindi." },
+      { "title": "Take it like the real thing", "text": "Each section has its own timer. When it ends, the section closes and you move on, just like exam day." },
+      { "title": "Learn from every question", "text": "See your score first, then a full analysis, then a solution for every question you got wrong." }
+    ]
+  },
+  "sim": {
+    "title": "Real exam simulation",
+    "text": "Rules come from the exam itself. SSC CGL has four 15-minute sections you cannot return to. Other exams can allow moving between sections, and we follow whichever rule applies.",
+    "available": "Available now",
+    "more": "More exams are on the way.",
+    "open": "Open instructions"
+  },
+  "after": {
+    "title": "After the exam",
+    "items": [
+      { "title": "Summary", "text": "Your score and how many questions you attempted in each subject." },
+      { "title": "Analysis", "text": "Time per question, slowest questions and a comparison with your last attempt." },
+      { "title": "Question review", "text": "The solution, where you went wrong and how to improve, for every question." },
+      { "title": "Strong and weak areas", "text": "What to keep doing and what to practise next." }
+    ]
+  },
+  "improve": {
+    "title": "See yourself improve",
+    "text": "Every attempt is compared with your last one, so you can see the marks you gained. A daily streak and activity map keep you consistent.",
+    "chip": "+12 marks since your last attempt",
+    "example": "Example",
+    "mapLabel": "Activity in the last 26 weeks"
+  },
+  "faq": {
+    "title": "Questions",
+    "items": [
+      { "q": "Does it work on a phone?", "a": "Yes. Exams run on phones and laptops. Some checks, such as full screen, work differently on some phones." },
+      { "q": "What does the camera do?", "a": "It checks that you are the only person in the frame. The video is not saved." },
+      { "q": "Can I change the language?", "a": "Choose it before a real exam starts. In practice you can switch any time." },
+      { "q": "What if I submit by mistake?", "a": "You can undo within 60 seconds, up to two times. Each undo counts as one warning." }
+    ]
+  },
+  "footer": { "nav": "Footer", "privacy": "Privacy", "terms": "Terms", "contact": "Contact", "copy": "© 2026 OmniAssess" }
+}

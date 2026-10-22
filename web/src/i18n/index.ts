@@ -2,6 +2,8 @@ import i18n from 'i18next'
 import { initReactI18next } from 'react-i18next'
 import en from './en.json'
 import hi from './hi.json'
+import enHome from './home.en.json'
+import hiHome from './home.hi.json'
 
 export type Lang = 'en' | 'hi'
 
@@ -16,7 +18,10 @@ function saved(): Lang {
 }
 
 i18n.use(initReactI18next).init({
-  resources: { en: { translation: en }, hi: { translation: hi } },
+  resources: {
+    en: { translation: { ...en, ...enHome } },
+    hi: { translation: { ...hi, ...hiHome } },
+  },
   lng: saved(),
   fallbackLng: 'en', // anything not translated yet shows in English, never empty
   interpolation: { escapeValue: false },

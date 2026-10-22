@@ -2,7 +2,7 @@
   "nav": { "exams": "परीक्षाएँ", "practice": "अभ्यास", "results": "परिणाम", "how": "यह कैसे काम करता है" },
   "header": {
     "home": "OmniAssess होम", "mainNav": "मुख्य", "search": "खोजें", "logIn": "लॉग इन", "getStarted": "शुरू करें",
-    "language": "भाषा", "theme": "थीम बदलें", "light": "लाइट", "dark": "डार्क", "system": "सिस्टम"
+    "language": "भाषा", "theme": "थीम बदलें", "light": "लाइट", "dark": "डार्क", "system": "सिस्टम",     "menu": "मेन्यू", "closeMenu": "मेन्यू बंद करें"
   },
   "journey": { "label": "आपकी यात्रा", "learn": "सीखें", "practice": "अभ्यास", "review": "समीक्षा", "improve": "सुधार", "succeed": "सफलता" },
   "hero": {
