@@ -5,5 +5,9 @@ import { defineConfig } from 'vite'
 // https://vite.dev/config/
 export default defineConfig({
   plugins: [react(), tailwindcss()],
-  server: { port: 5173, strictPort: true },
+  server: { 
+    proxy: {
+      '/api': 'http://127.0.0.1:4000',
+    },
+    port: 5173, strictPort: true },
 })
