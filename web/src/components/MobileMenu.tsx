@@ -1,5 +1,7 @@
 import { useRef, useState } from 'react'
+import { Link, useNavigate } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
+import { useAuth } from '../auth/context'
 import { useDismiss } from '../hooks/useDismiss'
 import { setLanguage, type Lang } from '../i18n'
 
@@ -18,9 +20,22 @@ const LANGS: { value: Lang; label: string }[] = [
 // Shown only on phones and small tablets (hidden from the "md" size up)
 export default function MobileMenu() {
   const { t, i18n } = useTranslation()
+  const { user, loading, logout } = useAuth()
+  const navigate = useNavigate()
   const [open, setOpen] = useState(false)
   const ref = useRef<HTMLDivElement>(null)
   useDismiss(open, () => setOpen(false), ref)
+
+  const close = () => setOpen(false)
+
+  async function onLogout() {
+    close()
+    await logout()
+    navigate('/', { replace: true })
+  }
+
+  const outlineBtn = 'rounded-lg border border-brand py-3 text-center font-semibold text-link hover:bg-brand-soft'
+  const solidBtn = 'rounded-lg bg-brand py-3 text-center font-semibold text-white hover:bg-brand-hover'
 
   return (
     <div ref={ref} className="md:hidden">
@@ -43,10 +58,10 @@ export default function MobileMenu() {
               <a
                 key={key}
                 href={href}
-                onClick={() => setOpen(false)}
+                onClick={close}
                 className="block border-b border-border px-6 py-3.5 font-semibold text-text hover:bg-brand-soft"
               >
-                {t(`nav.${key}`)}
+                {t('nav.' + key)}
               </a>
             ))}
           </nav>
@@ -59,23 +74,39 @@ export default function MobileMenu() {
                   type="button"
                   onClick={() => setLanguage(l.value)}
                   aria-pressed={i18n.language === l.value}
-                  className={`flex-1 py-2.5 text-sm font-semibold ${
-                    i18n.language === l.value ? 'bg-brand-soft text-link' : 'text-text'
-                  }`}
+                  className={
+                    'flex-1 py-2.5 text-sm font-semibold ' +
+                    (i18n.language === l.value ? 'bg-brand-soft text-link' : 'text-text')
+                  }
                 >
                   {l.label}
                   {i18n.language === l.value && ' ✓'}
                 </button>
               ))}
             </div>
-            <div className="mt-4 grid gap-2.5">
-              <a href="#login" className="rounded-lg border border-brand py-3 text-center font-semibold text-link hover:bg-brand-soft">
-                {t('header.logIn')}
-              </a>
-              <a href="#start" className="rounded-lg bg-brand py-3 text-center font-semibold text-white hover:bg-brand-hover">
-                {t('header.getStarted')}
-              </a>
-            </div>
+
+            {loading ? null : user ? (
+              <div className="mt-4 grid gap-2.5">
+                <Link to="/dashboard" onClick={close} className={solidBtn}>
+                  {t('auth.menu.dashboard')}
+                </Link>
+                <Link to="/onboarding" onClick={close} className={outlineBtn}>
+                  {t('auth.menu.profile')}
+                </Link>
+                <button type="button" onClick={onLogout} className={outlineBtn}>
+                  {t('auth.menu.logout')}
+                </button>
+              </div>
+            ) : (
+              <div className="mt-4 grid gap-2.5">
+                <Link to="/login" onClick={close} className={outlineBtn}>
+                  {t('header.logIn')}
+                </Link>
+                <Link to="/signup" onClick={close} className={solidBtn}>
+                  {t('header.getStarted')}
+                </Link>
+              </div>
+            )}
           </div>
         </div>
       )}
