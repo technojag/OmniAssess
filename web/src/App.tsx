@@ -2,6 +2,8 @@ import { Route, Routes } from 'react-router-dom'
 import AuthProvider from './auth/AuthProvider'
 import { GuestOnly, RequireAuth } from './auth/RouteGuards'
 import './i18n/auth'
+import AttemptDonePage from './pages/AttemptDonePage'
+import AttemptPage from './pages/AttemptPage'
 import AuthPage from './pages/AuthPage'
 import DashboardPage from './pages/DashboardPage'
 import ExamPage from './pages/ExamPage'
@@ -13,7 +15,14 @@ export default function App() {
     <AuthProvider>
       <Routes>
         <Route path="/" element={<Home />} />
-        <Route path="/exams/:slug" element={<ExamPage />} />
+        <Route
+          path="/exams/:slug"
+          element={
+            <RequireAuth>
+              <ExamPage />
+            </RequireAuth>
+          }
+        />
         <Route
           path="/login"
           element={
@@ -43,6 +52,22 @@ export default function App() {
           element={
             <RequireAuth>
               <DashboardPage />
+            </RequireAuth>
+          }
+        />
+        <Route
+          path="/attempts/:id"
+          element={
+            <RequireAuth>
+              <AttemptPage />
+            </RequireAuth>
+          }
+        />
+        <Route
+          path="/attempts/:id/done"
+          element={
+            <RequireAuth>
+              <AttemptDonePage />
             </RequireAuth>
           }
         />

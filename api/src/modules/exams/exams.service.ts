@@ -19,7 +19,14 @@ export async function listAvailableExams() {
           version: true,
           sections: {
             orderBy: { position: 'asc' },
-            select: { position: true, name: true, durationSeconds: true, questionCount: true },
+            select: {
+              position: true,
+              name: true,
+              durationSeconds: true,
+              questionCount: true,
+              marksPerQuestion: true,
+              negativeMarks: true,
+            },
           },
         },
       },
@@ -35,7 +42,14 @@ export async function listAvailableExams() {
       description: t.description,
       version: v.version,
       totalDurationSeconds: v.sections.reduce((sum, s) => sum + s.durationSeconds, 0),
-      sections: v.sections,
+      sections: v.sections.map((s) => ({
+        position: s.position,
+        name: s.name,
+        durationSeconds: s.durationSeconds,
+        questionCount: s.questionCount,
+        marksPerQuestion: Number(s.marksPerQuestion),
+        negativeMarks: Number(s.negativeMarks),
+      })),
     };
   });
 }
