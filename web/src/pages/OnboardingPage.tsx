@@ -10,9 +10,12 @@ type Category = 'SCHOOL' | 'COLLEGE' | 'GOVT_COMPETITIVE' | 'CORPORATE'
 type Field = {
   name: string
   kind: 'select' | 'text' | 'list'
+  required: boolean
   options?: string[]
   numeric?: boolean
   max?: number
+  // The field is shown (and counted) only when another field has this value
+  showWhen?: { field: string; value: string }
 }
 type Profile = {
   category: Category
@@ -21,37 +24,83 @@ type Profile = {
 } | null
 
 const CATEGORIES: Category[] = ['SCHOOL', 'COLLEGE', 'GOVT_COMPETITIVE', 'CORPORATE']
-const SEMESTERS = ['1', '2', '3', '4', '5', '6', '7', '8', '9', '10', '11', '12']
+
+// Semesters in each fixed degree. For "Other" the count is course duration (years) x 2.
+const SEMESTER_COUNT: Record<string, number> = {
+  BTECH: 8,
+  BSC: 6,
+  BCOM: 6,
+  BA: 6,
+}
+
+function semesterCount(form: Record<string, string>) {
+  if (form.degree === 'OTHER') return Number(form.courseYears || 0) * 2
+  return SEMESTER_COUNT[form.degree ?? ''] ?? 0
+}
+
+function semesterOptions(form: Record<string, string>) {
+  return Array.from({ length: semesterCount(form) }, (_, i) => String(i + 1))
+}
+
+const PLACEHOLDER_KEY: Record<string, string> = {
+  degreeOther: 'onb.phDegreeOther',
+  boardOther: 'onb.phBoardOther',
+  targetExamOther: 'onb.phTargetExamOther',
+}
 
 // Same fields and limits as api/src/modules/onboarding/onboarding.schemas.ts
+// (the semester options are not fixed here, they depend on the course)
 const FIELDS: Record<Category, Field[]> = {
   SCHOOL: [
-    { name: 'classLevel', kind: 'select', options: ['10', '12'] },
-    { name: 'board', kind: 'select', options: ['CBSE', 'ICSE', 'STATE', 'OTHER'] },
-    { name: 'subjects', kind: 'list' },
+    { name: 'classLevel', kind: 'select', required: true, options: ['10', '12'] },
+    { name: 'board', kind: 'select', required: true, options: ['CBSE', 'ICSE', 'STATE', 'OTHER'] },
+    { name: 'boardOther', kind: 'text', required: true, max: 60, showWhen: { field: 'board', value: 'OTHER' } },
+    { name: 'subjects', kind: 'list', required: true },
   ],
   COLLEGE: [
-    { name: 'degree', kind: 'select', options: ['BTECH', 'BSC', 'BCOM', 'BA', 'OTHER'] },
-    { name: 'semester', kind: 'select', options: SEMESTERS, numeric: true },
-    { name: 'coreSubject', kind: 'text', max: 60 },
+    { name: 'degree', kind: 'select', required: true, options: ['BTECH', 'BSC', 'BCOM', 'BA', 'OTHER'] },
+    { name: 'degreeOther', kind: 'text', required: true, max: 60, showWhen: { field: 'degree', value: 'OTHER' } },
+    {
+      name: 'courseYears',
+      kind: 'select',
+      required: true,
+      numeric: true,
+      options: ['1', '2', '3', '4', '5', '6'],
+      showWhen: { field: 'degree', value: 'OTHER' },
+    },
+    { name: 'semester', kind: 'select', required: true, numeric: true },
+    { name: 'coreSubject', kind: 'text', required: true, max: 60 },
   ],
   GOVT_COMPETITIVE: [
-    { name: 'targetExam', kind: 'select', options: ['UPSC', 'SSC_CGL', 'BANKING', 'RAILWAYS', 'OTHER'] },
-    { name: 'section', kind: 'text', max: 40 },
+    { name: 'targetExam', kind: 'select', required: true, options: ['UPSC', 'SSC_CGL', 'BANKING', 'RAILWAYS', 'OTHER'] },
+    {
+      name: 'targetExamOther',
+      kind: 'text',
+      required: true,
+      max: 60,
+      showWhen: { field: 'targetExam', value: 'OTHER' },
+    },
+    { name: 'section', kind: 'text', required: false, max: 40 },
   ],
   CORPORATE: [
-    { name: 'targetRole', kind: 'text', max: 60 },
+    { name: 'targetRole', kind: 'text', required: true, max: 60 },
     {
       name: 'experienceLevel',
       kind: 'select',
+      required: true,
       options: ['FRESHER', '0_2_YEARS', '2_5_YEARS', '5_PLUS_YEARS'],
     },
   ],
 }
 
+// Fields that are on screen right now (some depend on another answer)
+function visibleFields(category: Category, form: Record<string, string>) {
+  return FIELDS[category].filter((f) => !f.showWhen || form[f.showWhen.field] === f.showWhen.value)
+}
+
 function buildPayload(category: Category, form: Record<string, string>) {
   const body: Record<string, unknown> = { category }
-  for (const f of FIELDS[category]) {
+  for (const f of visibleFields(category, form)) {
     const raw = (form[f.name] ?? '').trim()
     if (!raw) continue
     if (f.kind === 'list') {
@@ -71,8 +120,20 @@ function buildPayload(category: Category, form: Record<string, string>) {
   return body
 }
 
-const inputClass =
-  'w-full rounded-md border border-border bg-surface px-3 py-2.5 text-text focus:outline-none focus:ring-2 focus:ring-brand'
+// Names of required fields that are still empty
+function missingFields(category: Category, form: Record<string, string>) {
+  return visibleFields(category, form)
+    .filter((f) => {
+      if (!f.required) return false
+      const raw = (form[f.name] ?? '').trim()
+      if (f.kind === 'list') return raw.split(',').every((s) => !s.trim())
+      return !raw
+    })
+    .map((f) => f.name)
+}
+
+const inputBase =
+  'w-full rounded-md border bg-surface px-3 py-2.5 text-text focus:outline-none focus:ring-2 focus:ring-brand disabled:opacity-60 '
 
 export default function OnboardingPage() {
   const { t } = useTranslation()
@@ -82,6 +143,7 @@ export default function OnboardingPage() {
   const [step, setStep] = useState<1 | 2>(1)
   const [category, setCategory] = useState<Category | null>(null)
   const [form, setForm] = useState<Record<string, string>>({})
+  const [errors, setErrors] = useState<Record<string, boolean>>({})
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState('')
 
@@ -101,18 +163,54 @@ export default function OnboardingPage() {
       .catch(() => {})
   }, [])
 
-  const setField = (name: string, value: string) => setForm((prev) => ({ ...prev, [name]: value }))
+  function setField(name: string, value: string) {
+    setForm((prev) => {
+      const next = { ...prev, [name]: value }
+      // Text boxes that belong to "Other" go away (and are emptied) when another choice is made
+      if (name === 'degree' && value !== 'OTHER') {
+        next.degreeOther = ''
+        next.courseYears = ''
+      }
+      if (name === 'board' && value !== 'OTHER') next.boardOther = ''
+      if (name === 'targetExam' && value !== 'OTHER') next.targetExamOther = ''
+      // A semester that does not exist in the new course is cleared
+      if ((name === 'degree' || name === 'courseYears') && next.semester) {
+        if (Number(next.semester) > semesterCount(next)) next.semester = ''
+      }
+      return next
+    })
+    setErrors((prev) => ({ ...prev, [name]: false }))
+  }
+
+  function optionsFor(f: Field) {
+    return f.name === 'semester' ? semesterOptions(form) : (f.options ?? [])
+  }
 
   function optionLabel(field: Field, value: string) {
     if (field.name === 'classLevel') return t('onb.classN', { n: value })
     if (field.name === 'semester') return t('onb.semesterN', { n: value })
+    if (field.name === 'courseYears') return t('onb.yearsN', { n: value })
     return t('onb.opt.' + value, { defaultValue: value })
+  }
+
+  // Semester stays closed until we know how many semesters the course has
+  function semesterHint() {
+    if (!form.degree) return t('onb.pickDegreeFirst')
+    return t('onb.pickDurationFirst')
   }
 
   async function onSubmit(e: FormEvent) {
     e.preventDefault()
     if (!category || busy) return
     setError('')
+
+    const missing = missingFields(category, form)
+    if (missing.length > 0) {
+      setErrors(Object.fromEntries(missing.map((m) => [m, true])))
+      document.getElementById(missing[0])?.focus()
+      return
+    }
+
     setBusy(true)
     try {
       await api('/onboarding', { method: 'POST', body: buildPayload(category, form) })
@@ -169,46 +267,67 @@ export default function OnboardingPage() {
         ) : null}
 
         {step === 2 && category ? (
-          <form onSubmit={onSubmit} className="mt-6 space-y-4">
-            <h2 className="font-semibold text-text">
-              {t('onb.details')} <span className="font-normal text-text/70">({t('onb.optional')})</span>
-            </h2>
+          <form onSubmit={onSubmit} noValidate className="mt-6 space-y-4">
+            <h2 className="font-semibold text-text">{t('onb.details')}</h2>
 
-            {FIELDS[category].map((f) => (
-              <div key={f.name}>
-                <label htmlFor={f.name} className="mb-1 block text-sm font-semibold text-text">
-                  {t('onb.f.' + f.name)}
-                </label>
-                {f.kind === 'select' ? (
-                  <select
-                    id={f.name}
-                    value={form[f.name] ?? ''}
-                    onChange={(e) => setField(f.name, e.target.value)}
-                    className={inputClass}
-                  >
-                    <option value="">{t('onb.select')}</option>
-                    {f.options?.map((o) => (
-                      <option key={o} value={o}>
-                        {optionLabel(f, o)}
-                      </option>
-                    ))}
-                  </select>
-                ) : (
-                  <input
-                    id={f.name}
-                    type="text"
-                    maxLength={f.kind === 'list' ? 300 : f.max}
-                    value={form[f.name] ?? ''}
-                    onChange={(e) => setField(f.name, e.target.value)}
-                    className={inputClass}
-                  />
-                )}
-              </div>
-            ))}
+            {visibleFields(category, form).map((f) => {
+              const semesterClosed = f.name === 'semester' && semesterCount(form) === 0
+              const bad = errors[f.name]
+              const cls = inputBase + (bad ? 'border-red-600' : 'border-border')
+              return (
+                <div key={f.name}>
+                  <label htmlFor={f.name} className="mb-1 block text-sm font-semibold text-text">
+                    {t('onb.f.' + f.name)}
+                    {f.required ? (
+                      <span aria-hidden="true" className="text-red-600">
+                        {' *'}
+                      </span>
+                    ) : (
+                      <span className="font-normal text-text/70"> ({t('onb.optional')})</span>
+                    )}
+                  </label>
+                  {f.kind === 'select' ? (
+                    <select
+                      id={f.name}
+                      value={form[f.name] ?? ''}
+                      disabled={semesterClosed}
+                      required={f.required}
+                      aria-invalid={bad ? true : undefined}
+                      onChange={(e) => setField(f.name, e.target.value)}
+                      className={cls}
+                    >
+                      <option value="">{semesterClosed ? semesterHint() : t('onb.select')}</option>
+                      {optionsFor(f).map((o) => (
+                        <option key={o} value={o}>
+                          {optionLabel(f, o)}
+                        </option>
+                      ))}
+                    </select>
+                  ) : (
+                    <input
+                      id={f.name}
+                      type="text"
+                      maxLength={f.kind === 'list' ? 300 : f.max}
+                      value={form[f.name] ?? ''}
+                      placeholder={PLACEHOLDER_KEY[f.name] ? t(PLACEHOLDER_KEY[f.name]) : undefined}
+                      required={f.required}
+                      aria-invalid={bad ? true : undefined}
+                      onChange={(e) => setField(f.name, e.target.value)}
+                      className={cls}
+                    />
+                  )}
+                  {bad ? (
+                    <p role="alert" className="mt-1 text-sm text-red-600">
+                      {t('onb.required')}
+                    </p>
+                  ) : null}
+                </div>
+              )
+            })}
 
             <div>
               <label htmlFor="focusNotes" className="mb-1 block text-sm font-semibold text-text">
-                {t('onb.f.focusNotes')}
+                {t('onb.f.focusNotes')} <span className="font-normal text-text/70">({t('onb.optional')})</span>
               </label>
               <textarea
                 id="focusNotes"
@@ -216,7 +335,7 @@ export default function OnboardingPage() {
                 maxLength={300}
                 value={form.focusNotes ?? ''}
                 onChange={(e) => setField('focusNotes', e.target.value)}
-                className={inputClass}
+                className={inputBase + 'border-border'}
               />
             </div>
 
