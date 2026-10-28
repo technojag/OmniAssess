@@ -21,6 +21,7 @@ type Exam = {
   name: string
   description: string | null
   totalDurationSeconds: number
+  allowEarlySubmit: boolean
   sections: Section[]
 }
 
@@ -146,6 +147,7 @@ export default function ExamPage() {
               {RULES.map((r) => (
                 <li key={r}>{t('exam.instr.' + r)}</li>
               ))}
+              {!exam.allowEarlySubmit ? <li>{t('exam.instr.r7')}</li> : null}
             </ul>
 
             <p className="mb-2 mt-8 text-sm font-semibold text-text">{t('exam.instr.language')}</p>

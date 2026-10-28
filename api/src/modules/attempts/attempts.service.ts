@@ -1,6 +1,7 @@
 import { Prisma, QuestionStatus, VersionStatus } from '@prisma/client';
 import { prisma } from '../../db';
 import { AppError } from '../../lib/errors';
+import { loadSubmitPolicy } from './attempts.policy';
 import {
   EngineError,
   canSaveAnswer,
@@ -219,6 +220,7 @@ export async function getAttemptView(userId: string, attemptId: string) {
       integrityScore: attempt.integrityScore,
     },
     // true when a section just ended and the candidate must press Continue
+    rules: await loadSubmitPolicy(attempt.templateVersionId),
     awaitingContinue: attempt.status === 'IN_PROGRESS' && !active,
     sections: attempt.sections.map((s) => ({
       position: s.position,

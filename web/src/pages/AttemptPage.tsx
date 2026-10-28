@@ -33,6 +33,7 @@ type View = {
   serverTime: string
   attempt: { id: string; status: 'IN_PROGRESS' | 'SUBMITTED' | 'TERMINATED' | 'EXPIRED'; isPractice: boolean }
   awaitingContinue: boolean
+  rules: { allowEarlySubmit: boolean }
   sections: SectionInfo[]
   currentSection: { position: number; questions: Question[] } | null
 }
@@ -277,6 +278,8 @@ export default function AttemptPage() {
   const answeredCount = questions.filter((q) => q.selectedOptionId).length
   const markedCount = questions.filter((q) => q.markedForReview).length
   const lowTime = remainingMs !== null && remainingMs <= 60_000
+  // Submit exists only if the exam allows it, and the engine allows it only in the last section
+  const canSubmit = view.rules.allowEarlySubmit && !view.sections.some((s) => s.state === 'PENDING')
 
   return (
     <div className="min-h-screen pb-32">
@@ -296,13 +299,19 @@ export default function AttemptPage() {
               {formatTime(remainingMs ?? 0)}
             </p>
           </div>
-          <button
-            type="button"
-            onClick={() => setConfirming(true)}
-            className="rounded-md bg-brand px-4 py-2.5 font-semibold text-white hover:bg-brand-hover"
-          >
-            {t('exam.run.submit')}
-          </button>
+          {canSubmit ? (
+            <button
+              type="button"
+              onClick={() => setConfirming(true)}
+              className="rounded-md bg-brand px-4 py-2.5 font-semibold text-white hover:bg-brand-hover"
+            >
+              {t('exam.run.submit')}
+            </button>
+          ) : (
+            <p className="hidden max-w-40 text-xs text-text/70 sm:block">
+              {t(view.rules.allowEarlySubmit ? 'exam.run.submitLater' : 'exam.run.submitAuto')}
+            </p>
+          )}
         </div>
       </header>
 

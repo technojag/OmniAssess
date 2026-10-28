@@ -1,5 +1,6 @@
 import { VersionStatus } from '@prisma/client';
 import { prisma } from '../../db';
+import { resolveSubmitPolicy } from '../attempts/attempts.policy';
 
 // Candidate-facing list. Answer keys (isCorrect) are never selected here.
 export async function listAvailableExams() {
@@ -17,6 +18,7 @@ export async function listAvailableExams() {
         take: 1,
         select: {
           version: true,
+          rules: true,
           sections: {
             orderBy: { position: 'asc' },
             select: {
@@ -41,6 +43,7 @@ export async function listAvailableExams() {
       category: t.category,
       description: t.description,
       version: v.version,
+      allowEarlySubmit: resolveSubmitPolicy(v.rules).allowEarlySubmit,
       totalDurationSeconds: v.sections.reduce((sum, s) => sum + s.durationSeconds, 0),
       sections: v.sections.map((s) => ({
         position: s.position,
