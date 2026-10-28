@@ -9,6 +9,9 @@ import DashboardPage from './pages/DashboardPage'
 import ExamPage from './pages/ExamPage'
 import Home from './pages/Home'
 import OnboardingPage from './pages/OnboardingPage'
+import ResultAnalysisPage from './pages/ResultAnalysisPage'
+import ResultReviewPage from './pages/ResultReviewPage'
+import ResultSummaryPage from './pages/ResultSummaryPage'
 
 export default function App() {
   return (
@@ -68,6 +71,30 @@ export default function App() {
           element={
             <RequireAuth>
               <AttemptDonePage />
+            </RequireAuth>
+          }
+        />
+        <Route
+          path="/attempts/:id/result"
+          element={
+            <RequireAuth>
+              <ResultSummaryPage />
+            </RequireAuth>
+          }
+        />
+        <Route
+          path="/attempts/:id/analysis"
+          element={
+            <RequireAuth>
+              <ResultAnalysisPage />
+            </RequireAuth>
+          }
+        />
+        <Route
+          path="/attempts/:id/review"
+          element={
+            <RequireAuth>
+              <ResultReviewPage />
             </RequireAuth>
           }
         />
