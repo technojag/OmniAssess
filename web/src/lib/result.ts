@@ -30,6 +30,7 @@ export type ReviewQuestion = {
   options: { id: string; text: string }[]
   selectedOptionId: string | null
   correctOptionId: string | null
+  markedForReview: boolean
 }
 
 export type Review = {

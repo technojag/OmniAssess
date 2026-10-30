@@ -26,7 +26,7 @@ async function loadScored(userId: string, attemptId: string) {
           options: { orderBy: { position: 'asc' }, select: { id: true, text: true, isCorrect: true } },
         },
       },
-      response: { select: { selectedOptionId: true } },
+      response: { select: { selectedOptionId: true, markedForReview: true } },
     },
   });
 
@@ -98,6 +98,7 @@ export async function getReview(userId: string, attemptId: string) {
           stem: i.question.stem,
           explanation: i.question.explanation,
           options: i.question.options.map((o) => ({ id: o.id, text: o.text })),
+          markedForReview: i.response?.markedForReview ?? false,
           selectedOptionId: i.response?.selectedOptionId ?? null,
           correctOptionId: i.question.options.find((o) => o.isCorrect)?.id ?? null,
           outcome: result.sections.find((x) => x.position === s.position)!.outcomes[i.id],
