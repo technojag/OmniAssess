@@ -1,7 +1,10 @@
 import { Route, Routes } from 'react-router-dom'
 import AuthProvider from './auth/AuthProvider'
-import { GuestOnly, RequireAuth } from './auth/RouteGuards'
+import { GuestOnly, RequireAdmin, RequireAuth } from './auth/RouteGuards'
 import './i18n/auth'
+import AdminImportPage from './pages/AdminImportPage'
+import AdminQuestionEditPage from './pages/AdminQuestionEditPage'
+import AdminQuestionsPage from './pages/AdminQuestionsPage'
 import AttemptDonePage from './pages/AttemptDonePage'
 import AttemptPage from './pages/AttemptPage'
 import AuthPage from './pages/AuthPage'
@@ -96,6 +99,30 @@ export default function App() {
             <RequireAuth>
               <ResultReviewPage />
             </RequireAuth>
+          }
+        />
+        <Route
+          path="/admin/import"
+          element={
+            <RequireAdmin>
+              <AdminImportPage />
+            </RequireAdmin>
+          }
+        />
+        <Route
+          path="/admin/questions"
+          element={
+            <RequireAdmin>
+              <AdminQuestionsPage />
+            </RequireAdmin>
+          }
+        />
+        <Route
+          path="/admin/questions/:id"
+          element={
+            <RequireAdmin>
+              <AdminQuestionEditPage />
+            </RequireAdmin>
           }
         />
       </Routes>

@@ -62,6 +62,11 @@ export default function UserMenu() {
           <Link to="/dashboard" role="menuitem" onClick={() => setOpen(false)} className={item}>
             {t('auth.menu.dashboard')}
           </Link>
+            {user.role === 'ADMIN' ? (
+            <Link to="/admin/questions" role="menuitem" onClick={() => setOpen(false)} className={item}>
+              Admin
+            </Link>
+          ) : null}
           <Link to="/onboarding" role="menuitem" onClick={() => setOpen(false)} className={item}>
             {t('auth.menu.profile')}
           </Link>

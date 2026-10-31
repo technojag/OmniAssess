@@ -24,6 +24,15 @@ export function RequireAuth({ children }: { children: ReactNode }) {
   return <>{children}</>
 }
 
+// Only for admins. Everyone else goes back to the dashboard (the server blocks them as well).
+export function RequireAdmin({ children }: { children: ReactNode }) {
+  const { user, loading } = useAuth()
+  if (loading) return <PageLoader />
+  if (!user) return <Navigate to="/login" replace />
+  if (user.role !== 'ADMIN') return <Navigate to="/dashboard" replace />
+  return <>{children}</>
+}
+
 // Login and signup pages: logged-in users do not need them
 export function GuestOnly({ children }: { children: ReactNode }) {
   const { user, loading } = useAuth()

@@ -256,7 +256,12 @@ export default function ResultReviewPage() {
                       <span className="font-bold">{t('review.solution')}. </span>
                       {current.q.explanation}
                     </p>
-                  ) : null}
+                  ) : (
+                    <p className="mt-4 text-text/70">
+                      <span className="font-bold">{t('review.solution')}. </span>
+                      {t('review.noSolution')}
+                    </p>
+                  )}
 
                   <div className="mt-5 flex flex-wrap gap-3">
                     <button
