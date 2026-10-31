@@ -1,7 +1,9 @@
 import { Router } from 'express';
 import { requireAuth } from '../../middleware/require-auth';
 import { requireOnboarded } from '../../middleware/require-onboarded';
+import { assertCanStart } from '../exams/exams.access';
 import { attemptIdParam, responseParams, saveResponseSchema, startAttemptSchema } from './attempts.schemas';
+import { listMyAttempts } from './attempts.list';
 import { getProctoringLog, recordViolation, violationSchema } from './attempts.proctoring';
 import { getReview, getSummary } from './attempts.result';
 import { continueSection, getAttemptView, saveAnswer, startOrResume } from './attempts.service';
@@ -13,9 +15,19 @@ export const attemptsRouter = Router();
 
 attemptsRouter.use(requireAuth, requireOnboarded);
 
+// The candidate's own attempts (dashboard: running exam and recent attempts)
+attemptsRouter.get('/', async (req, res, next) => {
+  try {
+    res.json({ attempts: await listMyAttempts(req.auth!.userId) });
+  } catch (err) {
+    next(err);
+  }
+});
+
 attemptsRouter.post('/', async (req, res, next) => {
   try {
     const { examSlug, isPractice } = startAttemptSchema.parse(req.body);
+    await assertCanStart(req.auth!.userId, examSlug);
     const { attemptId, resumed } = await startOrResume(req.auth!.userId, examSlug, isPractice);
     const view = await getAttemptView(req.auth!.userId, attemptId);
     res.status(resumed ? 200 : 201).json({ resumed, ...view });

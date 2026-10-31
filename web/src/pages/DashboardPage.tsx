@@ -4,7 +4,11 @@ import { useTranslation } from 'react-i18next'
 import { useAuth } from '../auth/context'
 import Header from '../components/Header'
 import { api } from '../lib/api'
+import { STATUS_STYLE } from '../lib/attempts'
+import type { AttemptRow } from '../lib/attempts'
+import { formatNumber } from '../lib/result'
 import '../i18n/dashboard'
+import '../i18n/history'
 
 type ExamSection = {
   position: number
@@ -34,19 +38,21 @@ const TARGET_WORDS: Record<string, string[]> = {
   RAILWAYS: ['rrb', 'railway'],
 }
 
-const PLACEHOLDERS = ['continue', 'recent', 'daily', 'countdown', 'compare'] as const
+const PLACEHOLDERS = ['daily', 'countdown', 'compare'] as const
 
 type Data = {
   exams: ExamSummary[]
   target: string | null // UPSC, SSC_CGL, BANKING, RAILWAYS or OTHER (Government exams only)
   targetName: string | null // the name the student wrote when target is OTHER
   category: string | null
+  attempts: AttemptRow[] | null // null = could not be loaded
 }
 
 async function fetchData(): Promise<Data> {
-  const [examsRes, profileRes] = await Promise.all([
+  const [examsRes, profileRes, attemptsRes] = await Promise.all([
     api<{ exams: ExamSummary[] }>('/exams'),
     api<{ profile: Profile }>('/onboarding').catch(() => ({ profile: null as Profile })),
+    api<{ attempts: AttemptRow[] }>('/attempts').catch(() => null),
   ])
   const p = profileRes.profile
   const isGovt = p?.category === 'GOVT_COMPETITIVE'
@@ -57,6 +63,7 @@ async function fetchData(): Promise<Data> {
     target: typeof rawTarget === 'string' ? rawTarget : null,
     targetName: typeof rawName === 'string' && rawName.trim() ? rawName.trim() : null,
     category: p?.category ?? null,
+    attempts: attemptsRes ? attemptsRes.attempts : null,
   }
 }
 
@@ -73,7 +80,7 @@ function examsForStudent({ exams, target, category }: Data) {
 }
 
 export default function DashboardPage() {
-  const { t } = useTranslation()
+  const { t, i18n } = useTranslation()
   const { user } = useAuth()
   const name = user?.fullName.split(' ')[0] ?? ''
 
@@ -107,6 +114,12 @@ export default function DashboardPage() {
       ? (data.targetName ?? t('onb.opt.OTHER'))
       : t('onb.opt.' + data.target, { defaultValue: data.target })
 
+  const running = data?.attempts?.filter((a) => a.status === 'IN_PROGRESS') ?? []
+  // The list is newest first, so the first finished attempt is the latest one
+  const latest = data?.attempts?.find((a) => a.status !== 'IN_PROGRESS') ?? null
+  const locale = i18n.language.startsWith('hi') ? 'hi-IN' : 'en-IN'
+  const when = (iso: string) => new Date(iso).toLocaleString(locale, { dateStyle: 'medium', timeStyle: 'short' })
+
   return (
     <>
       <Header />
@@ -119,6 +132,24 @@ export default function DashboardPage() {
             <p className="font-semibold text-text">{t('dash.yourTarget', { exam: targetLabel })}</p>
           </div>
         ) : null}
+
+        {running.map((a) => (
+          <section key={a.id} className="mt-5 rounded-xl border-2 border-brand bg-brand-soft p-5">
+            <p className="text-sm font-semibold text-link">{t('dash.cont.title')}</p>
+            <h2 className="mt-1 text-lg font-bold text-text">{a.exam.name}</h2>
+            <p className="mt-1 text-sm text-text/80">
+              {a.current?.sectionName
+                ? t('dash.cont.section', { name: a.current.sectionName })
+                : t('dash.cont.between')}
+            </p>
+            <Link
+              to={'/attempts/' + a.id}
+              className="mt-4 inline-block rounded-md bg-brand px-6 py-2.5 font-semibold text-white hover:bg-brand-hover"
+            >
+              {t('dash.cont.resume')}
+            </Link>
+          </section>
+        ))}
 
         <section className="mt-8">
           <h2 className="mb-3 text-lg font-bold text-text">{t('dash.exams')}</h2>
@@ -184,7 +215,55 @@ export default function DashboardPage() {
           )}
         </section>
 
-        <section className="mt-10 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+        {data ? (
+          <section className="mt-10">
+            <Link
+              to="/attempts"
+              className="block rounded-xl border border-border bg-surface p-5 shadow-sm hover:bg-brand-soft focus:outline-none focus-visible:ring-2 focus-visible:ring-brand"
+            >
+              <div className="flex items-center justify-between gap-3">
+                <h2 className="text-lg font-bold text-text">{t('dash.recent.title')}</h2>
+                <span className="shrink-0 text-sm font-semibold text-link">{t('dash.recent.seeAll')} →</span>
+              </div>
+
+              {data.attempts === null ? (
+                <p className="mt-2 text-red-600">{t('dash.recent.error')}</p>
+              ) : latest ? (
+                <div className="mt-3">
+                  <p className="text-xs font-semibold uppercase text-text/70">{t('dash.recent.latest')}</p>
+                  <div className="mt-1 flex flex-wrap items-center justify-between gap-3">
+                    <div className="min-w-0">
+                      <p className="truncate font-semibold text-text">{latest.exam.name}</p>
+                      <p className="text-sm text-text/70">{when(latest.submittedAt ?? latest.startedAt)}</p>
+                    </div>
+                    <div className="flex flex-wrap items-center gap-3">
+                      <span
+                        className={
+                          'rounded-full px-3 py-0.5 text-xs font-semibold ' +
+                          (STATUS_STYLE[latest.status] ?? 'bg-gray-500 text-white')
+                        }
+                      >
+                        {t('dash.recent.status.' + latest.status)}
+                      </span>
+                      {latest.score !== null && latest.maxScore !== null ? (
+                        <span className="font-semibold text-text">
+                          {t('dash.recent.score', {
+                            score: formatNumber(latest.score),
+                            max: formatNumber(latest.maxScore),
+                          })}
+                        </span>
+                      ) : null}
+                    </div>
+                  </div>
+                </div>
+              ) : (
+                <p className="mt-2 text-text/80">{t('dash.recent.empty')}</p>
+              )}
+            </Link>
+          </section>
+        ) : null}
+
+        <section className="mt-6 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
           {PLACEHOLDERS.map((key) => (
             <div key={key} className="min-w-0 rounded-xl border border-dashed border-border p-5">
               <h3 className="font-semibold text-text">{t('dash.cards.' + key)}</h3>

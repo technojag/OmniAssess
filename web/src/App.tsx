@@ -7,6 +7,7 @@ import AdminQuestionEditPage from './pages/AdminQuestionEditPage'
 import AdminQuestionsPage from './pages/AdminQuestionsPage'
 import AttemptDonePage from './pages/AttemptDonePage'
 import AttemptPage from './pages/AttemptPage'
+import AttemptsHistoryPage from './pages/AttemptsHistoryPage'
 import AuthPage from './pages/AuthPage'
 import DashboardPage from './pages/DashboardPage'
 import ExamPage from './pages/ExamPage'
@@ -21,6 +22,14 @@ export default function App() {
     <AuthProvider>
       <Routes>
         <Route path="/" element={<Home />} />
+                <Route
+          path="/attempts"
+          element={
+            <RequireAuth>
+              <AttemptsHistoryPage />
+            </RequireAuth>
+          }
+        />
         <Route
           path="/exams/:slug"
           element={

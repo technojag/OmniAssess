@@ -18,8 +18,6 @@ const en = {
     questionsN: '{{n}} questions',
     soon: 'Coming soon',
     cards: {
-      continue: 'Continue your attempt',
-      recent: 'Recent attempts',
       daily: 'Daily challenge',
       countdown: 'Exam countdown',
       compare: 'Compare with last attempt',
@@ -29,6 +27,25 @@ const en = {
       SCHOOL: 'School',
       COLLEGE: 'College',
       CORPORATE: 'Corporate',
+    },
+    cont: {
+      title: 'Continue your attempt',
+      section: 'Current section: {{name}}',
+      between: 'The next section is waiting for you.',
+      resume: 'Resume exam',
+    },
+    recent: {
+      title: 'Recent attempts',
+      empty: 'You have not attempted any exam yet.',
+      error: 'Could not load your attempts.',
+      score: '{{score}} / {{max}}',
+      viewResult: 'View result',
+      status: {
+        SUBMITTED: 'Completed',
+        TERMINATED: 'Ended early (warnings)',
+        EXPIRED: 'Expired',
+        IN_PROGRESS: 'In progress',
+      },
     },
   },
 }
@@ -50,8 +67,6 @@ const hi = {
     questionsN: '{{n}} प्रश्न',
     soon: 'जल्द आ रहा है',
     cards: {
-      continue: 'अपना अटेम्प्ट जारी रखें',
-      recent: 'हाल के अटेम्प्ट',
       daily: 'डेली चैलेंज',
       countdown: 'परीक्षा काउंटडाउन',
       compare: 'पिछले अटेम्प्ट से तुलना',
@@ -61,6 +76,25 @@ const hi = {
       SCHOOL: 'स्कूल',
       COLLEGE: 'कॉलेज',
       CORPORATE: 'कॉरपोरेट',
+    },
+    cont: {
+      title: 'अपना अटेम्प्ट जारी रखें',
+      section: 'मौजूदा सेक्शन: {{name}}',
+      between: 'अगला सेक्शन आपका इंतज़ार कर रहा है।',
+      resume: 'परीक्षा जारी रखें',
+    },
+    recent: {
+      title: 'हाल के अटेम्प्ट',
+      empty: 'आपने अभी तक कोई परीक्षा नहीं दी है।',
+      error: 'आपके अटेम्प्ट लोड नहीं हो पाए।',
+      score: '{{score}} / {{max}}',
+      viewResult: 'रिज़ल्ट देखें',
+      status: {
+        SUBMITTED: 'पूरा हुआ',
+        TERMINATED: 'जल्दी समाप्त (चेतावनियाँ)',
+        EXPIRED: 'समय समाप्त',
+        IN_PROGRESS: 'जारी है',
+      },
     },
   },
 }
