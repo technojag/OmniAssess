@@ -4,6 +4,7 @@ import { useTranslation } from 'react-i18next'
 import Header from '../components/Header'
 import { api } from '../lib/api'
 import { setLanguage, type Lang } from '../i18n'
+import CameraCheck from '../components/exam/CameraCheck'
 import '../i18n/exam'
 
 type Section = {
@@ -22,6 +23,7 @@ type Exam = {
   description: string | null
   totalDurationSeconds: number
   allowEarlySubmit: boolean
+  cameraRequired: boolean
   sections: Section[]
 }
 
@@ -44,6 +46,7 @@ export default function ExamPage() {
   const [agreed, setAgreed] = useState(false)
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState('')
+  const [cameraOk, setCameraOk] = useState(false)
 
   useEffect(() => {
     let cancelled = false
@@ -60,7 +63,7 @@ export default function ExamPage() {
   }, [slug])
 
   async function start() {
-    if (!exam || !agreed || busy) return
+    if (!exam || !agreed || busy || (exam.cameraRequired && !cameraOk)) return
     setError('')
     setBusy(true)
     // Fullscreen can only be asked for while the click is still happening
@@ -171,6 +174,7 @@ export default function ExamPage() {
               })}
             </div>
 
+            {exam.cameraRequired ? <CameraCheck onResult={setCameraOk} /> : null}
             <label className="mt-8 flex items-start gap-3 text-text">
               <input
                 type="checkbox"
@@ -190,7 +194,7 @@ export default function ExamPage() {
             <button
               type="button"
               onClick={start}
-              disabled={!agreed || busy}
+              disabled={!agreed || busy || (exam.cameraRequired && !cameraOk)}
               className="mt-6 w-full rounded-md bg-brand px-8 py-3 font-semibold text-white hover:bg-brand-hover disabled:opacity-50 sm:w-auto"
             >
               {busy ? t('exam.instr.starting') : t('exam.instr.start')}

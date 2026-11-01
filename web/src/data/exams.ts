@@ -34,11 +34,11 @@ function distance(a: string, b: string): number {
   return dp[a.length][b.length]
 }
 
-export function searchExams(query: string): Exam[] {
+export function searchExams(query: string, list: Exam[] = EXAMS): Exam[] {
   const tokens = norm(query).split(/\s+/).filter(Boolean)
-  if (tokens.length === 0) return EXAMS
+  if (tokens.length === 0) return list
 
-  return EXAMS.filter((e) => {
+  return list.filter((e) => {
     const words = [...e.keywords, e.name.en, e.name.hi].flatMap((k) => norm(k).split(/[\s—-]+/)).filter(Boolean)
     return tokens.every((tok) => words.some((w) => w.startsWith(tok) || (tok.length >= 4 && distance(w, tok) <= 1)))
   }).sort((a, b) => Number(b.available) - Number(a.available))

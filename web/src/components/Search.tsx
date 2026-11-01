@@ -1,7 +1,11 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
+import { useAuth } from '../auth/context'
 import { searchExams, type Exam } from '../data/exams'
+import { api } from '../lib/api'
+import '../i18n/dashboard'
+import '../i18n/searchExtra'
 
 const SearchIcon = ({ className = '' }: { className?: string }) => (
   <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" className={className} aria-hidden="true">
@@ -10,16 +14,72 @@ const SearchIcon = ({ className = '' }: { className?: string }) => (
   </svg>
 )
 
+// The part of GET /exams that search needs (api/src/modules/exams/exams.service.ts)
+type ApiExam = {
+  slug: string
+  name: string
+  category: string
+  totalDurationSeconds: number
+  sections: { position: number }[]
+}
+
+const NO_EXAMS: Exam[] = []
+
 export default function Search() {
   const { t, i18n } = useTranslation()
+  const { user, loading } = useAuth()
   const navigate = useNavigate()
   const dialogRef = useRef<HTMLDialogElement>(null)
   const [open, setOpen] = useState(false)
   const [query, setQuery] = useState('')
   const [active, setActive] = useState(0)
   const [sent, setSent] = useState(false)
+  // The exams this logged-in user may see, kept together with whose they are
+  const [mine, setMine] = useState<{ userId: string; list: ApiExam[] } | null>(null)
   const lang = i18n.language === 'hi' ? 'hi' : 'en'
-  const results = useMemo(() => searchExams(query), [query])
+
+  const myList = user && mine && mine.userId === user.id ? mine.list : null
+
+  // Logged-in users search the exams the server allows for them
+  const myExams = useMemo<Exam[] | null>(
+    () =>
+      myList
+        ? myList.map((e) => {
+            const detail =
+              t('dash.sectionsN', { n: e.sections.length }) +
+              ' · ' +
+              t('dash.minutesN', { n: Math.round(e.totalDurationSeconds / 60) })
+            return {
+              slug: e.slug,
+              name: { en: e.name, hi: e.name },
+              detail: { en: detail, hi: detail },
+              available: true,
+              keywords: [e.slug],
+            }
+          })
+        : null,
+    [myList, t],
+  )
+
+  // Logged out: everything (home page). Logged in or still checking: only the user's own exams.
+  const pool: Exam[] | undefined = user ? (myExams ?? NO_EXAMS) : loading ? NO_EXAMS : undefined
+  const results = useMemo(() => searchExams(query, pool), [query, pool])
+
+  // Load the user's exams the first time the search is opened
+  useEffect(() => {
+    if (!open || !user || myList !== null) return
+    let cancelled = false
+    api<{ exams: ApiExam[] }>('/exams')
+      .then((r) => {
+        if (!cancelled) setMine({ userId: user.id, list: r.exams })
+      })
+      .catch(() => {
+        if (!cancelled) setMine({ userId: user.id, list: [] })
+      })
+    return () => {
+      cancelled = true
+    }
+  }, [open, user, myList])
 
   function openPanel() {
     setQuery('')
@@ -69,6 +129,9 @@ export default function Search() {
     }
   }
 
+  const waiting = !!user && myExams === null // the user's exams are still loading
+  const listTitle = user ? t('search.mine') : t('search.title')
+
   return (
     <>
       <button
@@ -112,10 +175,14 @@ export default function Search() {
             </div>
 
             <div className="max-h-[60vh] overflow-y-auto p-2">
-              {results.length > 0 ? (
+              {waiting ? (
+                <p role="status" className="px-3 py-3 text-muted">
+                  {t('search.loading')}
+                </p>
+              ) : results.length > 0 ? (
                 <>
-                  <p className="px-3 pb-1 pt-2 text-xs font-semibold uppercase text-muted">{t('search.title')}</p>
-                  <ul role="listbox" aria-label={t('search.title')}>
+                  <p className="px-3 pb-1 pt-2 text-xs font-semibold uppercase text-muted">{listTitle}</p>
+                  <ul role="listbox" aria-label={listTitle}>
                     {results.map((e, i) => (
                       <li
                         key={e.slug}
@@ -143,6 +210,8 @@ export default function Search() {
                     ))}
                   </ul>
                 </>
+              ) : query.trim() === '' ? (
+                <p className="px-3 py-3 text-text/80">{t('search.noneForYou')}</p>
               ) : (
                 <div className="px-3 py-3">
                   <p className="font-semibold">{t('search.noMatch', { q: query.trim() })}</p>

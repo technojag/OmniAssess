@@ -44,6 +44,7 @@ export async function listAvailableExams() {
       description: t.description,
       version: v.version,
       allowEarlySubmit: resolveSubmitPolicy(v.rules).allowEarlySubmit,
+      cameraRequired: resolveSubmitPolicy(v.rules).cameraRequired,
       totalDurationSeconds: v.sections.reduce((sum, s) => sum + s.durationSeconds, 0),
       sections: v.sections.map((s) => ({
         position: s.position,

@@ -1,14 +1,21 @@
 import { z } from 'zod';
 import { prisma } from '../../db';
 
-const schema = z.object({ allowEarlySubmit: z.boolean().default(true) });
+const submissionSchema = z.object({ allowEarlySubmit: z.boolean().default(true) });
+const proctoringSchema = z.object({ cameraRequired: z.boolean().default(false) });
 
-// Reads template rules -> submission -> allowEarlySubmit.
-// If the template does not say anything, early submit stays allowed, so older templates keep working.
+// Reads these exam rules from the template:
+//   rules.submission.allowEarlySubmit  (missing means true)
+//   rules.proctoring.cameraRequired    (missing means false)
+// so older templates keep working exactly as before.
 export function resolveSubmitPolicy(rules: unknown) {
-  const raw = (rules as { submission?: unknown } | null)?.submission;
-  const parsed = schema.safeParse(raw ?? {});
-  return { allowEarlySubmit: parsed.success ? parsed.data.allowEarlySubmit : true };
+  const raw = (rules ?? {}) as { submission?: unknown; proctoring?: unknown };
+  const submission = submissionSchema.safeParse(raw.submission ?? {});
+  const proctoring = proctoringSchema.safeParse(raw.proctoring ?? {});
+  return {
+    allowEarlySubmit: submission.success ? submission.data.allowEarlySubmit : true,
+    cameraRequired: proctoring.success ? proctoring.data.cameraRequired : false,
+  };
 }
 
 export async function loadSubmitPolicy(templateVersionId: string) {
