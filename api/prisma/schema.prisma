@@ -74,6 +74,7 @@ model User {
   profile                UserProfile?
   attempts               ExamAttempt[]
   refreshTokens          RefreshToken[]
+  revisionItems          RevisionItem[]
 
   @@map("users")
 }
@@ -126,6 +127,7 @@ model Question {
   language     String            @default("en")
   options      QuestionOption[]
   attemptItems AttemptQuestion[]
+  revisionItems RevisionItem[]
   createdAt    DateTime          @default(now())
   updatedAt    DateTime          @updatedAt
 
@@ -288,4 +290,16 @@ model RefreshToken {
 
   @@index([userId])
   @@map("refresh_tokens")
+}
+model RevisionItem {
+  id         String   @id @default(uuid())
+  userId     String
+  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  questionId String
+  question   Question @relation(fields: [questionId], references: [id])
+  createdAt  DateTime @default(now())
+
+  @@unique([userId, questionId])
+  @@index([userId, createdAt])
+  @@map("revision_items")
 }

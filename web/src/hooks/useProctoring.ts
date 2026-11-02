@@ -1,26 +1,47 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { api } from '../lib/api'
 
-export type ViolationKind = 'TAB_SWITCH' | 'FULLSCREEN_EXIT'
+export type ViolationKind =
+  | 'TAB_SWITCH'
+  | 'FULLSCREEN_EXIT'
+  | 'FACE_MISSING'
+  | 'MULTIPLE_FACES'
+  | 'HANDS_HIDDEN'
+  | 'PHONE_DETECTED'
+  | 'OBJECT_DETECTED'
+  | 'GAZE_AWAY'
 
 // Same shape as recordViolation() in api/src/modules/attempts/attempts.proctoring.ts
 type ViolationResult = {
   counted: boolean
   kind?: ViolationKind
+  warningIssued?: boolean
   warningCount: number
   maxWarnings: number
   integrityScore: number
   terminated: boolean
 }
 
-export type ProctorWarning = { kind: ViolationKind; count: number; max: number; integrity: number }
+// issued = true when it used up one of the warnings, false when it only lowered the integrity score
+export type ProctorWarning = { kind: ViolationKind; count: number; max: number; integrity: number; issued: boolean }
+
+const CAMERA_KINDS: ViolationKind[] = [
+  'FACE_MISSING',
+  'MULTIPLE_FACES',
+  'HANDS_HIDDEN',
+  'PHONE_DETECTED',
+  'OBJECT_DETECTED',
+  'GAZE_AWAY',
+]
 
 // Some browsers (iPhone Safari) cannot do fullscreen for a page. There we skip that rule.
 const fullscreenSupported = typeof document !== 'undefined' && !!document.documentElement.requestFullscreen
 
 export function useProctoring(attemptId: string, enabled: boolean, onTerminated: () => void) {
   const [fullscreen, setFullscreen] = useState(() => !fullscreenSupported || !!document.fullscreenElement)
+  // warning = tab and fullscreen rules (big box), notice = camera rules (banner)
   const [warning, setWarning] = useState<ProctorWarning | null>(null)
+  const [notice, setNotice] = useState<ProctorWarning | null>(null)
   const wasFullscreen = useRef(!!document.fullscreenElement)
   const lastSent = useRef<Record<string, number>>({})
   const terminated = useRef(false)
@@ -42,7 +63,15 @@ export function useProctoring(attemptId: string, enabled: boolean, onTerminated:
           body: { kind },
         })
         if (r.counted) {
-          setWarning({ kind, count: r.warningCount, max: r.maxWarnings, integrity: r.integrityScore })
+          const w: ProctorWarning = {
+            kind,
+            count: r.warningCount,
+            max: r.maxWarnings,
+            integrity: r.integrityScore,
+            issued: r.warningIssued ?? true,
+          }
+          if (CAMERA_KINDS.includes(kind)) setNotice(w)
+          else setWarning(w)
         }
         if (r.terminated && !terminated.current) {
           terminated.current = true
@@ -104,6 +133,13 @@ export function useProctoring(attemptId: string, enabled: boolean, onTerminated:
     }
   }, [enabled, report])
 
+  // The camera banner hides itself after a few seconds
+  useEffect(() => {
+    if (!notice) return
+    const id = setTimeout(() => setNotice(null), 10000)
+    return () => clearTimeout(id)
+  }, [notice])
+
   const enterFullscreen = useCallback(async () => {
     try {
       await document.documentElement.requestFullscreen()
@@ -114,6 +150,7 @@ export function useProctoring(attemptId: string, enabled: boolean, onTerminated:
   }, [])
 
   const dismiss = useCallback(() => setWarning(null), [])
+  const dismissNotice = useCallback(() => setNotice(null), [])
 
-  return { fullscreen, warning, dismiss, enterFullscreen }
+  return { fullscreen, warning, notice, dismiss, dismissNotice, enterFullscreen, report }
 }

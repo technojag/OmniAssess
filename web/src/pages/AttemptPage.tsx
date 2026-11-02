@@ -33,7 +33,7 @@ type View = {
   serverTime: string
   attempt: { id: string; status: 'IN_PROGRESS' | 'SUBMITTED' | 'TERMINATED' | 'EXPIRED'; isPractice: boolean }
   awaitingContinue: boolean
-  rules: { allowEarlySubmit: boolean }
+  rules: { allowEarlySubmit: boolean; cameraRequired: boolean }
   sections: SectionInfo[]
   currentSection: { position: number; questions: Question[] } | null
 }
@@ -231,7 +231,7 @@ export default function AttemptPage() {
     const next = view.sections.find((s) => s.state === 'PENDING')
     return (
       <main className="mx-auto flex min-h-screen max-w-lg flex-col justify-center px-4 py-10">
-        <ProctorLayer attemptId={id} enabled={proctored} />
+      <ProctorLayer attemptId={id} enabled={proctored} cameraRequired={view.rules.cameraRequired} />
         <div className="rounded-xl border border-border bg-surface p-6 shadow-sm">
           <h1 className="text-2xl font-bold text-text">{t('exam.run.sectionOver')}</h1>
           {closed ? <p className="mt-2 text-text/80">{t('exam.run.sectionOverBody', { name: closed.name })}</p> : null}
@@ -283,7 +283,7 @@ export default function AttemptPage() {
 
   return (
     <div className="min-h-screen pb-32">
-      <ProctorLayer attemptId={id} enabled={proctored} />
+      <ProctorLayer attemptId={id} enabled={proctored} cameraRequired={view.rules.cameraRequired} />
       <header className="sticky top-0 z-10 flex items-center justify-between gap-3 border-b border-border bg-surface px-4 py-3">
         <div className="min-w-0">
           <p className="truncate font-bold text-text">{active.name}</p>

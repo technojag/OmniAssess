@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
 import { useAuth } from '../auth/context'
+import '../i18n/revision'
 
 export default function UserMenu() {
   const { t } = useTranslation()
@@ -61,6 +62,9 @@ export default function UserMenu() {
         >
           <Link to="/dashboard" role="menuitem" onClick={() => setOpen(false)} className={item}>
             {t('auth.menu.dashboard')}
+          </Link>
+                    <Link to="/revision" role="menuitem" onClick={() => setOpen(false)} className={item}>
+            {t('rev.nav')}
           </Link>
             {user.role === 'ADMIN' ? (
             <Link to="/admin/questions" role="menuitem" onClick={() => setOpen(false)} className={item}>

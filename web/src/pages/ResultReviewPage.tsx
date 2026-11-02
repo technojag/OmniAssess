@@ -8,6 +8,7 @@ import { outcomeOf } from '../lib/result'
 import type { Outcome, Review, ReviewQuestion } from '../lib/result'
 import '../i18n/result'
 import '../i18n/review'
+import '../i18n/revision'
 
 type Filter = 'all' | 'wrong' | 'skipped' | 'marked'
 
@@ -87,24 +88,32 @@ const FILTERS: { id: Filter; label: string }[] = [
   { id: 'marked', label: 'review.filterMarked' },
 ]
 
+const smallBtn = 'rounded-md border border-border px-5 py-2.5 font-semibold text-text hover:bg-brand-soft disabled:opacity-50'
+
 export default function ResultReviewPage() {
   const { id = '' } = useParams()
   const { t } = useTranslation()
 
   const [items, setItems] = useState<Item[] | null>(null)
+  const [listIds, setListIds] = useState<Set<string>>(() => new Set()) // questions already in the revision list
   const [failed, setFailed] = useState(false)
   const [tries, setTries] = useState(0)
   const [filter, setFilter] = useState<Filter>('all')
   const [selected, setSelected] = useState<string | null>(null)
+  const [busy, setBusy] = useState(false)
+  const [note, setNote] = useState('')
 
   useEffect(() => {
     let cancelled = false
     Promise.all([
       api<Review>('/attempts/' + id + '/review'),
       api<Timing>('/attempts/' + id + '/timing').catch(() => null), // the page still works without times
+      api<{ items: { questionId: string }[] }>('/revision').catch(() => null),
     ])
-      .then(([review, timing]) => {
-        if (!cancelled) setItems(build(review, timing))
+      .then(([review, timing, list]) => {
+        if (cancelled) return
+        setItems(build(review, timing))
+        setListIds(new Set(list ? list.items.map((i) => i.questionId) : []))
       })
       .catch(() => {
         if (!cancelled) setFailed(true)
@@ -120,10 +129,53 @@ export default function ResultReviewPage() {
     setTries((n) => n + 1)
   }
 
+  async function toggleSaved(questionId: string) {
+    if (busy) return
+    setBusy(true)
+    setNote('')
+    try {
+      if (listIds.has(questionId)) {
+        await api('/revision/' + questionId, { method: 'DELETE' })
+        setListIds((prev) => {
+          const next = new Set(prev)
+          next.delete(questionId)
+          return next
+        })
+      } else {
+        await api('/revision', { method: 'POST', body: { attemptId: id, questionId } })
+        setListIds((prev) => new Set(prev).add(questionId))
+      }
+    } catch {
+      setNote(t('rev.fail'))
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  async function addAllWrong() {
+    if (busy) return
+    setBusy(true)
+    setNote('')
+    try {
+      const r = await api<{ added: number; total: number }>('/revision/mistakes', {
+        method: 'POST',
+        body: { attemptId: id, includeSkipped: false },
+      })
+      const list = await api<{ items: { questionId: string }[] }>('/revision')
+      setListIds(new Set(list.items.map((i) => i.questionId)))
+      setNote(r.added > 0 ? t('rev.addedN', { n: r.added }) : t('rev.nothingToAdd'))
+    } catch {
+      setNote(t('rev.fail'))
+    } finally {
+      setBusy(false)
+    }
+  }
+
   const filtered = items ? items.filter((i) => matches(i, filter)) : []
   const current = filtered.find((i) => i.key === selected) ?? filtered[0]
   const pos = current ? filtered.indexOf(current) : -1
   const count = (f: Filter) => (items ? items.filter((i) => matches(i, f)).length : 0)
+  const saved = current ? listIds.has(current.q.questionId) : false
 
   return (
     <>
@@ -148,7 +200,7 @@ export default function ResultReviewPage() {
           </p>
         ) : (
           <>
-            <div className="mt-4 flex flex-wrap gap-2">
+            <div className="mt-4 flex flex-wrap items-center gap-2">
               {FILTERS.map((f) => (
                 <button
                   key={f.id}
@@ -163,7 +215,20 @@ export default function ResultReviewPage() {
                   {t(f.label)} {count(f.id)}
                 </button>
               ))}
+              <span className="flex-1" />
+              <button type="button" disabled={busy} onClick={() => void addAllWrong()} className={smallBtn + ' !px-4 !py-1.5 text-sm'}>
+                {t('rev.addAllWrong')}
+              </button>
             </div>
+
+            {note ? (
+              <p role="status" className="mt-3 rounded-md bg-brand-soft px-3 py-2 text-sm text-text">
+                {note}{' '}
+                <Link to="/revision" className="font-semibold text-link hover:underline">
+                  {t('rev.openList', { n: listIds.size })}
+                </Link>
+              </p>
+            ) : null}
 
             {!current ? (
               <p className="mt-6 rounded-xl border border-dashed border-border p-5 text-text/80">{t('review.empty')}</p>
@@ -268,7 +333,7 @@ export default function ResultReviewPage() {
                       type="button"
                       disabled={pos <= 0}
                       onClick={() => setSelected(filtered[pos - 1].key)}
-                      className="rounded-md border border-border px-5 py-2.5 font-semibold text-text hover:bg-brand-soft disabled:opacity-50"
+                      className={smallBtn}
                     >
                       {t('review.prev')}
                     </button>
@@ -276,9 +341,21 @@ export default function ResultReviewPage() {
                       type="button"
                       disabled={pos >= filtered.length - 1}
                       onClick={() => setSelected(filtered[pos + 1].key)}
-                      className="rounded-md border border-border px-5 py-2.5 font-semibold text-text hover:bg-brand-soft disabled:opacity-50"
+                      className={smallBtn}
                     >
                       {t('review.next')}
+                    </button>
+                    <button
+                      type="button"
+                      disabled={busy}
+                      onClick={() => void toggleSaved(current.q.questionId)}
+                      className={
+                        saved
+                          ? smallBtn
+                          : 'rounded-md bg-brand px-5 py-2.5 font-semibold text-white hover:bg-brand-hover disabled:opacity-50'
+                      }
+                    >
+                      {saved ? t('rev.remove') : t('rev.add')}
                     </button>
                   </div>
                 </article>

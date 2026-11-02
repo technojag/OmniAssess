@@ -7,6 +7,9 @@ import type { ProctoringLog, Timing } from '../../lib/analysis'
 import type { Outcome, Review } from '../../lib/result'
 import '../../i18n/result'
 import '../../i18n/analysis'
+import '../../i18n/cameraProctor'
+import '../../i18n/cameraObjects'
+import '../../i18n/cameraGaze'
 
 type Data = { timing: Timing; review: Review; log: ProctoringLog }
 
@@ -105,7 +108,13 @@ export default function AnalysisBody({ id }: { id: string }) {
   const violations = data.log.events.filter((e) => e.type === 'PROCTOR_VIOLATION')
   const fullscreenExits = violations.filter((e) => e.kind === 'FULLSCREEN_EXIT').length
   const tabSwitches = violations.filter((e) => e.kind === 'TAB_SWITCH').length
-  const clean = fullscreenExits === 0 && tabSwitches === 0
+  const faceMissing = violations.filter((e) => e.kind === 'FACE_MISSING').length
+  const multiFaces = violations.filter((e) => e.kind === 'MULTIPLE_FACES').length
+  const handsHidden = violations.filter((e) => e.kind === 'HANDS_HIDDEN').length
+  const phonesSeen = violations.filter((e) => e.kind === 'PHONE_DETECTED').length
+  const objectsSeen = violations.filter((e) => e.kind === 'OBJECT_DETECTED').length
+  const gazeAway = violations.filter((e) => e.kind === 'GAZE_AWAY').length
+  const clean = violations.length === 0
 
   return (
     <>
@@ -167,6 +176,12 @@ export default function AnalysisBody({ id }: { id: string }) {
             {clean ? <p>{t('analysis.conductClean')}</p> : null}
             {fullscreenExits > 0 ? <p>{t('analysis.conductFullscreen', { n: fullscreenExits })}</p> : null}
             {tabSwitches > 0 ? <p>{t('analysis.conductTab', { n: tabSwitches })}</p> : null}
+            {faceMissing > 0 ? <p>{t('analysis.conductFace', { n: faceMissing })}</p> : null}
+            {multiFaces > 0 ? <p>{t('analysis.conductMulti', { n: multiFaces })}</p> : null}
+            {handsHidden > 0 ? <p>{t('analysis.conductHands', { n: handsHidden })}</p> : null}
+            {phonesSeen > 0 ? <p>{t('analysis.conductPhone', { n: phonesSeen })}</p> : null}
+            {objectsSeen > 0 ? <p>{t('analysis.conductObject', { n: objectsSeen })}</p> : null}
+            {gazeAway > 0 ? <p>{t('analysis.conductGaze', { n: gazeAway })}</p> : null}
             {data.log.status === 'TERMINATED' ? (
               <p className="font-semibold text-red-600">{t('analysis.conductTerminated')}</p>
             ) : null}

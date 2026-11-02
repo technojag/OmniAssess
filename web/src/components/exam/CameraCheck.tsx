@@ -1,22 +1,27 @@
 import { useEffect, useRef, useState } from 'react'
+import type { FaceLandmarker } from '@mediapipe/tasks-vision'
 import { useTranslation } from 'react-i18next'
-import { analyze, loadDetectors } from '../../lib/vision'
+import { averageMetrics, clearBaseline, saveBaseline } from '../../lib/gaze'
+import type { GazeMetrics } from '../../lib/gaze'
+import { analyze, loadDetectors, loadGazeModel, readGaze } from '../../lib/vision'
 import type { Detectors } from '../../lib/vision'
 import '../../i18n/camera'
+import '../../i18n/cameraGaze'
 
-type Flags = { camera: boolean; face: boolean; voice: boolean; hands: boolean }
-const NONE: Flags = { camera: false, face: false, voice: false, hands: false }
+type Flags = { camera: boolean; face: boolean; voice: boolean; gaze: boolean }
+const NONE: Flags = { camera: false, face: false, voice: false, gaze: false }
 
 const TICK_MS = 300
-const HOLD_MS = 1500 // a face (and both hands) must stay in view this long
+const HOLD_MS = 1500 // a face must stay in view this long
 const VOICE_MS = 900 // total time the voice must be heard
 const VOICE_LEVEL = 0.03 // quiet room noise stays below this
+const CALIBRATION_LOOKS = 7 // about 2 seconds of looking at the middle of the screen
 
 const STEPS = [
   ['camera', 'stepCamera'],
   ['face', 'stepFace'],
   ['voice', 'stepVoice'],
-  ['hands', 'stepHands'],
+  ['gaze', 'stepGaze'],
 ] as const
 
 type Props = { onResult: (ok: boolean) => void }
@@ -46,6 +51,7 @@ export default function CameraCheck({ onResult }: Props) {
   async function start() {
     stop()
     onResult(false)
+    clearBaseline()
     setErrorKey('')
     setFlags(NONE)
     setLevel(0)
@@ -86,6 +92,8 @@ export default function CameraCheck({ onResult }: Props) {
       setPhase('idle')
       return
     }
+    // If the gaze model cannot load, that step passes by itself and gaze is simply not checked in the exam
+    const gazeModel: FaceLandmarker | null = await loadGazeModel().catch(() => null)
 
     const video = videoRef.current
     if (!video) {
@@ -107,9 +115,9 @@ export default function CameraCheck({ onResult }: Props) {
     const samples = new Uint8Array(analyser.fftSize)
 
     let faceMs = 0
-    let handsMs = 0
     let voiceMs = 0
-    const done: Flags = { ...NONE, camera: true }
+    const looks: GazeMetrics[] = []
+    const done: Flags = { ...NONE, camera: true, gaze: gazeModel === null }
     setPhase('running')
     setFlags({ ...done })
 
@@ -122,11 +130,19 @@ export default function CameraCheck({ onResult }: Props) {
     const timer = setInterval(() => {
       if (video.readyState >= 2) {
         try {
-          const { faces, hands } = analyze(detectors, video)
+          const { faces } = analyze(detectors, video)
           faceMs = faces === 1 ? faceMs + TICK_MS : 0
-          handsMs = hands >= 2 ? handsMs + TICK_MS : 0
           if (faceMs >= HOLD_MS) done.face = true
-          if (handsMs >= HOLD_MS) done.hands = true
+
+          // Calibration comes last: the student looks at the middle of the screen
+          if (gazeModel && done.face && done.voice && !done.gaze && faces === 1) {
+            const metrics = readGaze(gazeModel, video)
+            if (metrics) looks.push(metrics)
+            if (looks.length >= CALIBRATION_LOOKS) {
+              saveBaseline(averageMetrics(looks))
+              done.gaze = true
+            }
+          }
         } catch {
           // skip this frame
         }
@@ -144,7 +160,7 @@ export default function CameraCheck({ onResult }: Props) {
       if (voiceMs >= VOICE_MS) done.voice = true
 
       setFlags({ ...done })
-      if (done.face && done.voice && done.hands) finish()
+      if (done.face && done.voice && done.gaze) finish()
     }, TICK_MS)
 
     stopRef.current = () => {
@@ -157,7 +173,7 @@ export default function CameraCheck({ onResult }: Props) {
 
   const running = phase === 'running'
   // One hint at a time: the first thing that is still missing
-  const hint = !flags.face ? 'hintFace' : !flags.voice ? 'hintVoice' : !flags.hands ? 'hintHands' : null
+  const hint = !flags.face ? 'hintFace' : !flags.voice ? 'hintVoice' : !flags.gaze ? 'hintGaze' : null
 
   return (
     <section className="mt-8 rounded-xl border border-border bg-surface p-5" aria-labelledby="cam-title">

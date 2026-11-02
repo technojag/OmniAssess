@@ -16,13 +16,22 @@ import OnboardingPage from './pages/OnboardingPage'
 import ResultAnalysisPage from './pages/ResultAnalysisPage'
 import ResultReviewPage from './pages/ResultReviewPage'
 import ResultSummaryPage from './pages/ResultSummaryPage'
+import RevisionPage from './pages/RevisionPage'
 
 export default function App() {
   return (
     <AuthProvider>
       <Routes>
         <Route path="/" element={<Home />} />
-                <Route
+        <Route
+          path="/revision"
+          element={
+            <RequireAuth>
+              <RevisionPage />
+            </RequireAuth>
+          }
+        />
+        <Route
           path="/attempts"
           element={
             <RequireAuth>

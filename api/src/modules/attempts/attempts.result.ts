@@ -19,6 +19,7 @@ async function loadScored(userId: string, attemptId: string) {
       id: true,
       position: true,
       attemptSectionId: true,
+      questionId: true,
       question: {
         select: {
           stem: true,
@@ -94,6 +95,7 @@ export async function getReview(userId: string, attemptId: string) {
       questions: items
         .filter((i) => i.attemptSectionId === s.id)
         .map((i) => ({
+          questionId: i.questionId,
           position: i.position,
           stem: i.question.stem,
           explanation: i.question.explanation,
