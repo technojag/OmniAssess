@@ -8,6 +8,9 @@ export const VIOLATION_KINDS = [
   'HANDS_HIDDEN',
   'TAB_SWITCH',
   'FULLSCREEN_EXIT',
+  'PHONE_DETECTED',
+  'OBJECT_DETECTED',
+  'GAZE_AWAY',
 ] as const;
 export type ViolationKind = (typeof VIOLATION_KINDS)[number];
 
@@ -22,6 +25,9 @@ export const DEFAULT_VIOLATIONS: Record<ViolationKind, ViolationRule> = {
   HANDS_HIDDEN: { penalty: 10, warning: false },
   TAB_SWITCH: { penalty: 25, warning: true },
   FULLSCREEN_EXIT: { penalty: 15, warning: true },
+  PHONE_DETECTED: { penalty: 25, warning: true },
+  OBJECT_DETECTED: { penalty: 10, warning: false },
+  GAZE_AWAY: { penalty: 3, warning: false },
 };
 
 const ruleSchema = z.object({
