@@ -9,6 +9,7 @@ import { examsRouter } from './modules/exams/exams.routes';
 import { attemptsRouter } from './modules/attempts/attempts.routes';
 import { adminRouter } from './modules/admin/admin.routes';
 import { revisionRouter } from './modules/revision/revision.routes';
+import { dailyRouter } from './modules/daily/daily.routes';
 import { errorHandler } from './middleware/error-handler';
 
 export const app = express();
@@ -39,6 +40,7 @@ app.use('/api/v1/exams', examsRouter);
 app.use('/api/v1/attempts', attemptsRouter);
 app.use('/api/v1/admin', adminRouter);
 app.use('/api/v1/revision', revisionRouter);
+app.use('/api/v1/daily', dailyRouter);
 
 // Must be the LAST middleware
 app.use(errorHandler);

@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
 import { useAuth } from '../auth/context'
 import Header from '../components/Header'
+import DailyChallenge from '../components/daily/DailyChallenge'
 import { api } from '../lib/api'
 import { STATUS_STYLE } from '../lib/attempts'
 import type { AttemptRow } from '../lib/attempts'
@@ -38,7 +39,7 @@ const TARGET_WORDS: Record<string, string[]> = {
   RAILWAYS: ['rrb', 'railway'],
 }
 
-const PLACEHOLDERS = ['daily', 'countdown', 'compare'] as const
+const PLACEHOLDERS = ['countdown', 'compare'] as const
 
 type Data = {
   exams: ExamSummary[]
@@ -215,6 +216,8 @@ export default function DashboardPage() {
           )}
         </section>
 
+        <DailyChallenge />
+
         {data ? (
           <section className="mt-10">
             <Link
@@ -263,7 +266,7 @@ export default function DashboardPage() {
           </section>
         ) : null}
 
-        <section className="mt-6 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+        <section className="mt-6 grid gap-4 sm:grid-cols-2">
           {PLACEHOLDERS.map((key) => (
             <div key={key} className="min-w-0 rounded-xl border border-dashed border-border p-5">
               <h3 className="font-semibold text-text">{t('dash.cards.' + key)}</h3>
