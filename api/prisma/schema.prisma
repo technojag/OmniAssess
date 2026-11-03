@@ -303,3 +303,16 @@ model RevisionItem {
   @@index([userId, createdAt])
   @@map("revision_items")
 }
+
+model DailyAnswer {
+  id         String   @id @default(uuid())
+  userId     String
+  questionId String
+  day        String
+  correct    Boolean
+  createdAt  DateTime @default(now())
+
+  @@unique([userId, day, questionId])
+  @@index([userId, day])
+  @@map("daily_answers")
+}

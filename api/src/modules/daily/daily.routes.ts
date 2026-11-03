@@ -17,7 +17,7 @@ dailyRouter.get('/', async (_req, res, next) => {
 
 dailyRouter.post('/check', async (req, res, next) => {
   try {
-    res.json(await checkDaily(checkBody.parse(req.body)));
+    res.json(await checkDaily(req.auth!.userId, checkBody.parse(req.body)));
   } catch (err) {
     next(err);
   }

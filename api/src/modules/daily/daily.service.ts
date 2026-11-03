@@ -3,7 +3,7 @@ import { z } from 'zod';
 import { prisma } from '../../db';
 import { AppError } from '../../lib/errors';
 
-const DAILY_COUNT = 5;
+export const DAILY_COUNT = 5;
 const IST_OFFSET_MS = 5.5 * 60 * 60 * 1000;
 
 export const checkBody = z.object({
@@ -11,16 +11,16 @@ export const checkBody = z.object({
   optionId: z.string().uuid('Invalid option id'),
 });
 
-// Today's date in India time, like "2026-11-03"
-function todayKey(): string {
-  return new Date(Date.now() + IST_OFFSET_MS).toISOString().slice(0, 10);
+// The date in India time for any moment, like "2026-11-03"
+export function istDayKey(date: Date = new Date()): string {
+  return new Date(date.getTime() + IST_OFFSET_MS).toISOString().slice(0, 10);
 }
 
 function scoreFor(dateKey: string, questionId: string): string {
   return createHash('sha256').update(dateKey + ':' + questionId).digest('hex');
 }
 
-// Same 5 questions all day, different ones the next day. No database table needed.
+// Same 5 questions all day, different ones the next day.
 async function pickTodayIds(dateKey: string): Promise<string[]> {
   const rows = await prisma.question.findMany({
     where: { status: 'APPROVED' },
@@ -36,7 +36,7 @@ async function pickTodayIds(dateKey: string): Promise<string[]> {
 
 /** Today's questions WITHOUT the answer key. */
 export async function getDaily() {
-  const date = todayKey();
+  const date = istDayKey();
   const ids = await pickTodayIds(date);
   if (ids.length === 0) return { date, questions: [] };
 
@@ -67,11 +67,12 @@ export async function getDaily() {
   return { date, questions };
 }
 
-/** Checks one answer. Only works for today's questions, so other answer keys never leak. */
-export async function checkDaily(input: z.infer<typeof checkBody>) {
-  const ids = await pickTodayIds(todayKey());
+/** Checks one answer and remembers that the student answered it today. */
+export async function checkDaily(userId: string, input: z.infer<typeof checkBody>) {
+  const day = istDayKey();
+  const ids = await pickTodayIds(day);
   if (!ids.includes(input.questionId)) {
-    throw new AppError(404, 'QUESTION_NOT_FOUND', 'This question is not in today\'s challenge.');
+    throw new AppError(404, 'QUESTION_NOT_FOUND', "This question is not in today's challenge.");
   }
 
   const q = await prisma.question.findUnique({
@@ -88,9 +89,14 @@ export async function checkDaily(input: z.infer<typeof checkBody>) {
   }
 
   const correctOptionId = q.options.find((o) => o.isCorrect)?.id ?? null;
-  return {
-    correct: correctOptionId === input.optionId,
-    correctOptionId,
-    explanation: q.explanation,
-  };
+  const correct = correctOptionId === input.optionId;
+
+  // One row per student, day and question: checking again the same day does not count twice
+  await prisma.dailyAnswer.upsert({
+    where: { userId_day_questionId: { userId, day, questionId: input.questionId } },
+    create: { userId, day, questionId: input.questionId, correct },
+    update: {},
+  });
+
+  return { correct, correctOptionId, explanation: q.explanation };
 }

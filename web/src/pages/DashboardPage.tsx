@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
 import { useAuth } from '../auth/context'
 import Header from '../components/Header'
+import ActivityGrid from '../components/activity/ActivityGrid'
 import DailyChallenge from '../components/daily/DailyChallenge'
 import { api } from '../lib/api'
 import { STATUS_STYLE } from '../lib/attempts'
@@ -87,6 +88,7 @@ export default function DashboardPage() {
 
   const [data, setData] = useState<Data | null>(null)
   const [failed, setFailed] = useState(false)
+  const [activityKey, setActivityKey] = useState(0)
 
   function retry() {
     setFailed(false)
@@ -216,7 +218,9 @@ export default function DashboardPage() {
           )}
         </section>
 
-        <DailyChallenge />
+        <DailyChallenge onAnswered={() => setActivityKey((k) => k + 1)} />
+
+        <ActivityGrid refreshKey={activityKey} />
 
         {data ? (
           <section className="mt-10">

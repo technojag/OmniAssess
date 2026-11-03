@@ -21,7 +21,7 @@ type CheckResponse = {
 
 type Checked = CheckResponse & { optionId: string }
 
-export default function DailyChallenge() {
+export default function DailyChallenge({ onAnswered }: { onAnswered?: () => void }) {
   const { t } = useTranslation()
   const [data, setData] = useState<DailyData | null>(null)
   const [failed, setFailed] = useState(false)
@@ -64,6 +64,7 @@ export default function DailyChallenge() {
     })
       .then((r) => {
         setResults((prev) => ({ ...prev, [q.id]: { ...r, optionId } }))
+        onAnswered?.()
       })
       .catch(() => setCheckError(true))
       .finally(() => setChecking(false))
