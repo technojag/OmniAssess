@@ -5,6 +5,7 @@ import { api } from '../../lib/api'
 import { joinTimes } from '../../lib/analysis'
 import type { ProctoringLog, Timing } from '../../lib/analysis'
 import type { Outcome, Review } from '../../lib/result'
+import CompareCard from './CompareCard'
 import '../../i18n/result'
 import '../../i18n/analysis'
 import '../../i18n/cameraProctor'
@@ -119,11 +120,7 @@ export default function AnalysisBody({ id }: { id: string }) {
   return (
     <>
       <div className="grid gap-4 md:grid-cols-2">
-        <section className={card}>
-          <h2 className="font-bold text-text">{t('analysis.compare')}</h2>
-          <p className="mt-2 text-sm text-text/70">{t('analysis.compareSoon')}</p>
-          <p className="mt-3 text-sm font-semibold text-text/70">{t('analysis.soon')}</p>
-        </section>
+        <CompareCard id={id} />
 
         <section className={card}>
           <h2 className="font-bold text-text">{t('analysis.avgTitle')}</h2>

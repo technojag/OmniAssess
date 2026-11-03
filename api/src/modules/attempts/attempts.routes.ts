@@ -3,6 +3,7 @@ import { requireAuth } from '../../middleware/require-auth';
 import { requireOnboarded } from '../../middleware/require-onboarded';
 import { assertCanStart } from '../exams/exams.access';
 import { attemptIdParam, responseParams, saveResponseSchema, startAttemptSchema } from './attempts.schemas';
+import { getComparison } from './attempts.compare';
 import { listMyAttempts } from './attempts.list';
 import { getProctoringLog, recordViolation, violationSchema } from './attempts.proctoring';
 import { getReview, getSummary } from './attempts.result';
@@ -118,6 +119,16 @@ attemptsRouter.get('/:id/summary', async (req, res, next) => {
   try {
     const { id } = attemptIdParam.parse(req.params);
     res.json(await getSummary(req.auth!.userId, id));
+  } catch (err) {
+    next(err);
+  }
+});
+
+// Compared with the student's previous finished attempt of the same exam
+attemptsRouter.get('/:id/compare', async (req, res, next) => {
+  try {
+    const { id } = attemptIdParam.parse(req.params);
+    res.json(await getComparison(req.auth!.userId, id));
   } catch (err) {
     next(err);
   }

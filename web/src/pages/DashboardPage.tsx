@@ -5,6 +5,7 @@ import { useAuth } from '../auth/context'
 import Header from '../components/Header'
 import ActivityGrid from '../components/activity/ActivityGrid'
 import DailyChallenge from '../components/daily/DailyChallenge'
+import DashboardCompare from '../components/dashboard/DashboardCompare'
 import { api } from '../lib/api'
 import { STATUS_STYLE } from '../lib/attempts'
 import type { AttemptRow } from '../lib/attempts'
@@ -40,7 +41,7 @@ const TARGET_WORDS: Record<string, string[]> = {
   RAILWAYS: ['rrb', 'railway'],
 }
 
-const PLACEHOLDERS = ['countdown', 'compare'] as const
+const PLACEHOLDERS = ['countdown'] as const
 
 type Data = {
   exams: ExamSummary[]
@@ -214,6 +215,12 @@ export default function DashboardPage() {
                   </article>
                 )
               })}
+
+              <DashboardCompare
+                key={latest?.id ?? 'none'}
+                attemptId={latest?.id ?? null}
+                examName={latest?.exam.name ?? ''}
+              />
             </div>
           )}
         </section>
